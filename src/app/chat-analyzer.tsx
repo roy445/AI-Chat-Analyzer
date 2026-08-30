@@ -134,10 +134,12 @@ function Upload({ platform, onParsed, onBack }: { platform: Platform; onParsed: 
     if (!file) return;
     setError(""); setErrorCode("FILE-003"); setParsing(true); setProgress(8);
     const startedAt = Date.now();
+    const logUsage = (eventType: string) => { void fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType }) }).catch(() => undefined); };
+    logUsage("file_parse_start");
     try {
       setPhase("正在讀取聊天紀錄……"); setProgress(22); await delay(420); setPhase("正在整理訊息……"); setProgress(48);
       const result = await parseChatFile(platform, file);
-      setPhase("正在檢查聊天者……"); setProgress(78); await delay(520); setPhase("準備分析工作區……"); setProgress(94); await delay(Math.max(0, 3000 - (Date.now() - startedAt))); setProgress(100); onParsed(result);
+      setPhase("正在檢查聊天者……"); setProgress(78); await delay(520); setPhase("準備分析工作區……"); setProgress(94); await delay(Math.max(0, 3000 - (Date.now() - startedAt))); setProgress(100); logUsage("file_parse_complete"); onParsed(result);
     } catch (caught) {
       if (caught instanceof ChatParseError) { setError(caught.message); setErrorCode(caught.code); }
       else { setError("這個檔案目前無法辨識，請確認檔案完整後再試一次。"); setErrorCode("FILE-003"); }

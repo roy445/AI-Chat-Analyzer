@@ -22,6 +22,8 @@ export const errorTestHistory = pgTable("error_test_history", {
   code: text("code").notNull(),
   name: text("name").notNull(),
   severity: text("severity").notNull(),
+  source: text("source").notNull().default("test"),
+  message: text("message"),
   startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
 });
