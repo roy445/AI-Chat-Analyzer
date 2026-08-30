@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Ban, CheckCircle2, Clock3, Megaphone, ShieldCheck, TriangleAlert } from "lucide-react";
 import { ERROR_CATALOG, errorInfo } from "@/lib/error-catalog";
 
-const errorCodes = ERROR_CATALOG.map((item) => item.code);
+const errorCodes = ERROR_CATALOG.filter((item) => !item.code.startsWith("ADMIN-")).map((item) => item.code);
 const usageLabels: Record<string, string> = { analysis_start: "分析開始", analysis_complete: "分析完成", ai_start: "AI 分析開始", ai_complete: "AI 分析完成", file_parse_start: "檔案解析開始", file_parse_complete: "檔案解析完成", share_create: "建立分享", share_view: "查看分享", analysis: "分析", ai: "AI 分析", share: "分享", file_parse: "檔案解析" };
 
 type Settings = { analysisEnabled: boolean; aiEnabled: boolean; sharingEnabled: boolean; announcement: string | null; announcementLevel: string; testErrorCode?: string | null };
