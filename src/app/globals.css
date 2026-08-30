@@ -793,3 +793,9 @@ img, svg { max-width: 100%; }
 .admin-feedback-top.success { border-color: #5bb486; background: #eafaf1; color: #105e3d; }
 .admin-feedback-top.error { border-color: #dc6879; background: #fff0f3; color: #94243b; }
 @media (max-width: 620px) { .admin-feedback-top { top: 8px; margin-top: 8px; padding: 14px 15px; font-size: 13px; } }
+
+.field-help { display: block; margin-top: 2px; color: #66738d; font-size: 11px; font-weight: 500; line-height: 1.55; }
+.field-readonly { background: #f3f5fa !important; color: #6b7892 !important; cursor: not-allowed; }
+.field-readonly.matched { border-color: #88c5aa !important; background: #effaf4 !important; color: #185d40 !important; font-weight: 800; }
+.support-form select { width: 100%; border: 1px solid #ccd7ea; border-radius: 13px; padding: 12px 14px; color: #17213d; background: #fff; font: inherit; outline: none; }
+.support-form select:focus { border-color: #6c86e8; box-shadow: 0 0 0 4px rgba(108, 134, 232, .14); }
