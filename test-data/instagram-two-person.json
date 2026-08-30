@@ -1,0 +1,8 @@
+{
+  "participants": [{"name": "Mina"}, {"name": "Kai"}],
+  "messages": [
+    {"sender_name": "Mina", "timestamp_ms": 1742292000000, "content": "今天上課嗎？"},
+    {"sender_name": "Kai", "timestamp_ms": 1742292300000, "content": "有呀，下午見"},
+    {"sender_name": "Mina", "timestamp_ms": 1742292600000, "photos": [{"uri": "photo.jpg"}]}
+  ]
+}

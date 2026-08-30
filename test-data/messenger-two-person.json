@@ -1,0 +1,8 @@
+{
+  "participants": [{"name": "PERSON_A"}, {"name": "PERSON_B"}],
+  "messages": [
+    {"sender_name": "PERSON_A", "timestamp_ms": 1742292000000, "content": "週末去看電影？"},
+    {"sender_name": "PERSON_B", "timestamp_ms": 1742292600000, "content": "好啊！", "reactions": [{"reaction": "😂"}]},
+    {"sender_name": "PERSON_A", "timestamp_ms": 1742296200000, "videos": [{"uri": "clip.mp4"}]}
+  ]
+}
