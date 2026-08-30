@@ -601,3 +601,14 @@ body { color: #17213d; }
 .recap .recap-item { background: rgba(255,255,255,.72); border: 1px solid rgba(93, 105, 143, .16); }
 @media (max-width: 700px) { .share-section-grid { grid-template-columns: 1fr; } }
 @media print { .recap { color: #17213d !important; } .share-section-grid, .share-anonymity { display: none !important; } }
+
+/* Visible progress feedback for local parsing and AI analysis */
+.progress-meter { width: min(430px, 100%); height: 9px; overflow: hidden; margin: 18px auto 7px; border-radius: 999px; background: #e5eaf5; box-shadow: inset 0 1px 2px rgba(25, 39, 71, .08); }
+.progress-meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6c86e8, #58c6a5 82%, #f5b56e); transition: width .6s cubic-bezier(.22, 1, .36, 1); }
+.progress-meter-label { display: flex; width: min(430px, 100%); justify-content: space-between; margin: 0 auto; color: #52627d; font-size: 11px; }
+.progress-meter-label b { color: #293a65; }
+.ai-wait-panel { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 16px; margin-top: 19px; padding: 14px; border: 1px solid #dbe4f4; border-radius: 16px; background: #f8fbff; text-align: left; }
+.ai-wait-panel .analysis-visual.small { width: 52px; min-height: 52px; transform: scale(.72); transform-origin: center; }
+.ai-wait-panel .progress-meter { margin: 10px 0 6px; }
+.ai-wait-panel .progress-meter-label { width: 100%; }
+@media (max-width: 520px) { .ai-wait-panel { grid-template-columns: 1fr; text-align: center; } .ai-wait-panel .analysis-visual.small { margin: -4px auto -12px; } }

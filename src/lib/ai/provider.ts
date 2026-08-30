@@ -105,6 +105,31 @@ export class GeminiProvider implements AiProvider {
   }
 }
 
+export class OpenRouterProvider implements AiProvider {
+  name = "AI";
+
+  async analyze(input: string) {
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+    if (!apiKey) throw new Error("OPENROUTER_NOT_CONFIGURED");
+    const model = process.env.OPENROUTER_MODEL?.trim() || "openrouter/free";
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://ai-chat-analyzer.vercel.app", "X-Title": "AI Chat Analyzer" },
+      body: JSON.stringify({ model, messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: input }], temperature: 0.35 }),
+    });
+    if (!response.ok) {
+      let detail = "";
+      try { const errorJson = await response.json() as { error?: { message?: string; code?: string } }; detail = errorJson.error?.message || errorJson.error?.code || ""; } catch { detail = await response.text().catch(() => ""); }
+      throw new Error(`OPENROUTER_REQUEST_FAILED_${response.status}:${detail.slice(0, 180)}`);
+    }
+    const json = await response.json() as { choices?: { message?: { content?: string } }[] };
+    const raw = json.choices?.[0]?.message?.content?.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+    if (!raw) throw new Error("AI_EMPTY_RESPONSE");
+    const parsed = JSON.parse(raw) as Partial<AiAnalysis>;
+    return { provider: this.name, summary: typeof parsed.summary === "string" ? parsed.summary : "目前無法整理出摘要。", atmosphere: typeof parsed.atmosphere === "string" ? parsed.atmosphere : "目前無法可靠判斷整體氣氛。", observations: Array.isArray(parsed.observations) ? parsed.observations.filter((item): item is string => typeof item === "string").slice(0, 12) : [], cautions: Array.isArray(parsed.cautions) ? parsed.cautions.filter((item): item is string => typeof item === "string").slice(0, 8) : [], confidence: typeof parsed.confidence === "number" ? Math.max(0, Math.min(100, Math.round(parsed.confidence))) : 50, keyFindings: Array.isArray(parsed.keyFindings) ? parsed.keyFindings.filter((item): item is string => typeof item === "string").slice(0, 10) : [], communicationStyle: Array.isArray(parsed.communicationStyle) ? parsed.communicationStyle.filter((item): item is string => typeof item === "string").slice(0, 8) : [], emotionalSignals: Array.isArray(parsed.emotionalSignals) ? parsed.emotionalSignals.filter((item): item is string => typeof item === "string").slice(0, 8) : [], strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter((item): item is string => typeof item === "string").slice(0, 8) : [], frictionPoints: Array.isArray(parsed.frictionPoints) ? parsed.frictionPoints.filter((item): item is string => typeof item === "string").slice(0, 8) : [], actionableSuggestions: Array.isArray(parsed.actionableSuggestions) ? parsed.actionableSuggestions.filter((item): item is string => typeof item === "string").slice(0, 8) : [], evidence: Array.isArray(parsed.evidence) ? parsed.evidence.filter((item): item is string => typeof item === "string").slice(0, 10) : [] } satisfies AiAnalysis;
+  }
+}
+
 export function localAnalysis(report: AnalysisReport) {
   return safeFallback(report);
 }
@@ -113,7 +138,7 @@ export function minimizedReport(report: AnalysisReport) {
   return {
     platform: report.platformLabel,
     period: `${report.overview.startDate}–${report.overview.endDate}`,
-    participants: ["PERSON_A", "PERSON_B"],
+    participants: [report.me.name, report.them.name],
     counts: { total: report.overview.total, personA: report.overview.myMessages, personB: report.overview.theirMessages },
     initiative: report.initiative,
     response: { personA: report.response.me, personB: report.response.them, periods: report.response.byPeriod },
