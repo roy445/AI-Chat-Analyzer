@@ -22,38 +22,36 @@ function safeFallback(report: AnalysisReport): AiAnalysis {
   };
 }
 
-export class OpenAIProvider implements AiProvider {
-  name = "OpenAI";
+const SYSTEM_PROMPT = "你是繁體中文聊天互動分析助手。只能根據輸入的匿名化統計與摘要回答，不可臆測未提供的內容，不可診斷心理，不可判定喜歡或討厭。每項推測使用可能、疑似、從聊天紀錄來看。只輸出有效 JSON，不要 Markdown code fence。JSON keys: summary, atmosphere, observations(array), cautions(array), confidence(number 0-100), provider。";
+
+export class GeminiProvider implements AiProvider {
+  name = "Gemini";
 
   async analyze(input: string) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey?.trim()) throw new Error("AI_NOT_CONFIGURED");
-    const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
+    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        model,
-        temperature: 0.35,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "你是繁體中文聊天互動分析助手。只能根據輸入的匿名化統計與摘要回答，不可臆測未提供的內容，不可診斷心理，不可判定喜歡或討厭。每項推測使用可能、疑似、從聊天紀錄來看。輸出 JSON keys: summary, atmosphere, observations(array), cautions(array), confidence(number 0-100), provider。" },
-          { role: "user", content: input },
-        ],
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: input }] }],
+        generationConfig: { temperature: 0.35, responseMimeType: "application/json" },
       }),
     });
     if (!response.ok) {
       let detail = "";
       try {
-        const errorJson = await response.json() as { error?: { message?: string; code?: string } };
-        detail = errorJson.error?.message || errorJson.error?.code || "";
+        const errorJson = await response.json() as { error?: { message?: string; status?: string } };
+        detail = errorJson.error?.message || errorJson.error?.status || "";
       } catch {
         detail = await response.text().catch(() => "");
       }
-      throw new Error(`AI_REQUEST_FAILED_${response.status}:${detail.slice(0, 180)}`);
+      throw new Error(`GEMINI_REQUEST_FAILED_${response.status}:${detail.slice(0, 180)}`);
     }
-    const json = await response.json() as { choices?: { message?: { content?: string } }[] };
-    const content = json.choices?.[0]?.message?.content;
+    const json = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const content = json.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
     if (!content) throw new Error("AI_EMPTY_RESPONSE");
     const parsed = JSON.parse(content) as Partial<AiAnalysis>;
     return {
