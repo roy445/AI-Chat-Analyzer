@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const settings = await getSystemSettings();
-    if (!settings.aiEnabled) return errorResponse("AI-001", "AI 問答服務目前由管理員暫停，請稍後再試。", 503, "S1");
-    if (settings.testErrorCode?.startsWith("AI-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的 AI 錯誤測試。", 503, "S1");
+    if (!settings.aiEnabled) return errorResponse("AI-009", "AI 問答服務目前由管理員暫停；基本本機分析與報告仍可使用。", 503, "S1");
+    if (settings.testErrorCode?.startsWith("AI-")) return errorResponse(settings.testErrorCode, "AI 問答目前暫時無法使用，請稍後再試。", 503, "S1");
     await recordUsage("ai");
     const body = await request.json() as { report?: AnalysisReport; question?: string };
     const question = body.question?.trim();
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       }
     }
     if (process.env.OPENROUTER_API_KEY?.trim()) { const result = await new OpenRouterProvider().analyze(input); return Response.json({ answer: result.summary, provider: result.provider, confidence: result.confidence }); }
-    return Response.json({ answer: localQuestionAnswer(body.report, question), provider: "local-summary", confidence: body.report.v2.quality.completeness === "高" ? 72 : 43 });
+    return errorResponse("AI-004", "AI 問答尚未設定可用的 AI provider。", 503, "S1");
   } catch (error) {
     const raw = error instanceof Error ? error.message : "";
     console.error("[ai/ask] upstream failure", raw);
