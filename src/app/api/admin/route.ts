@@ -1,6 +1,7 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { systemSettings, usageEvents } from "@/db/schema";
+import { errorTestHistory, systemSettings, usageEvents } from "@/db/schema";
+import { errorInfo } from "@/lib/error-catalog";
 import { clearAdminCookie, isAdmin, setAdminCookie, validPassword } from "@/lib/admin-auth";
 import { errorResponse } from "@/lib/errors";
 
@@ -13,15 +14,15 @@ export async function POST(request: Request) {
   if (!(await isAdmin())) return errorResponse("ADMIN-002", "需要管理員登入才能執行這個操作。", 401, "S2");
   try {
     if (body.action === "log") { if (!["analysis", "ai", "share", "file_parse"].includes(body.eventType || "")) return errorResponse("ADMIN-003", "不支援的使用事件類型。", 400, "S2"); await db.insert(usageEvents).values({ eventType: body.eventType! }); return Response.json({ ok: true }); }
-    if (body.action === "settings") { const current = await getSettings(); await db.update(systemSettings).set({ analysisEnabled: body.analysisEnabled ?? current.analysisEnabled, aiEnabled: body.aiEnabled ?? current.aiEnabled, sharingEnabled: body.sharingEnabled ?? current.sharingEnabled, announcement: body.announcement?.slice(0, 500) ?? current.announcement, announcementLevel: body.announcementLevel || current.announcementLevel, testErrorCode: body.testErrorCode === undefined ? current.testErrorCode : body.testErrorCode, updatedAt: new Date() }).where(eq(systemSettings.id, 1)); return Response.json({ ok: true, settings: await getSettings() }); }
-    if (body.action === "simulate") { const code = body.eventType?.trim().toUpperCase(); if (!code || !/^[A-Z]+-\d{3}$/.test(code)) return errorResponse("ADMIN-004", "請選擇有效的錯誤代碼。", 400, "S2"); await db.update(systemSettings).set({ testErrorCode: code, updatedAt: new Date() }).where(eq(systemSettings.id, 1)); return Response.json({ ok: true, simulated: code }); }
+    if (body.action === "settings") { const current = await getSettings(); if (body.testErrorCode === null && current.testErrorCode) await db.update(errorTestHistory).set({ stoppedAt: new Date() }).where(and(eq(errorTestHistory.code, current.testErrorCode), isNull(errorTestHistory.stoppedAt))); await db.update(systemSettings).set({ analysisEnabled: body.analysisEnabled ?? current.analysisEnabled, aiEnabled: body.aiEnabled ?? current.aiEnabled, sharingEnabled: body.sharingEnabled ?? current.sharingEnabled, announcement: body.announcement?.slice(0, 500) ?? current.announcement, announcementLevel: body.announcementLevel || current.announcementLevel, testErrorCode: body.testErrorCode === undefined ? current.testErrorCode : body.testErrorCode, updatedAt: new Date() }).where(eq(systemSettings.id, 1)); return Response.json({ ok: true, settings: await getSettings() }); }
+    if (body.action === "simulate") { const code = body.eventType?.trim().toUpperCase(); if (!code || !/^[A-Z]+-\d{3}$/.test(code)) return errorResponse("ADMIN-004", "請選擇有效的錯誤代碼。", 400, "S2"); const info = errorInfo(code); const current = await getSettings(); if (current.testErrorCode) await db.update(errorTestHistory).set({ stoppedAt: new Date() }).where(and(eq(errorTestHistory.code, current.testErrorCode), isNull(errorTestHistory.stoppedAt))); await db.update(systemSettings).set({ testErrorCode: code, updatedAt: new Date() }).where(eq(systemSettings.id, 1)); await db.insert(errorTestHistory).values({ code, name: info.name, severity: info.severity }); return Response.json({ ok: true, simulated: code, name: info.name }); }
     return errorResponse("ADMIN-005", "不支援的管理員操作。", 400, "S2");
   } catch (error) { console.error("[admin] database failure", error); return errorResponse("ADMIN-006", "管理員設定資料庫暫時無法使用。", 503, "S1"); }
 }
 
 export async function GET() {
   if (!(await isAdmin())) return errorResponse("ADMIN-002", "需要管理員登入才能查看後台。", 401, "S2");
-  try { const settings = await getSettings(); const totals = await db.select({ eventType: usageEvents.eventType, count: sql<number>`count(*)` }).from(usageEvents).groupBy(usageEvents.eventType); const recent = await db.select({ eventType: usageEvents.eventType, createdAt: usageEvents.createdAt }).from(usageEvents).orderBy(desc(usageEvents.createdAt)).limit(100); return Response.json({ settings, totals, recent }); } catch (error) { console.error("[admin] read failure", error); return errorResponse("ADMIN-006", "管理員資料庫尚未建立或暫時無法使用。", 503, "S1"); }
+  try { const settings = await getSettings(); const totals = await db.select({ eventType: usageEvents.eventType, count: sql<number>`count(*)` }).from(usageEvents).groupBy(usageEvents.eventType); const recent = await db.select({ eventType: usageEvents.eventType, createdAt: usageEvents.createdAt }).from(usageEvents).orderBy(desc(usageEvents.createdAt)).limit(100); const testHistory = await db.select().from(errorTestHistory).orderBy(desc(errorTestHistory.startedAt)).limit(100); return Response.json({ settings, totals, recent, testHistory }); } catch (error) { console.error("[admin] read failure", error); return errorResponse("ADMIN-006", "管理員資料庫尚未建立或暫時無法使用。", 503, "S1"); }
 }
 
 async function getSettings() { const rows = await db.select().from(systemSettings).where(eq(systemSettings.id, 1)).limit(1); if (rows[0]) return rows[0]; await db.insert(systemSettings).values({ id: 1 }); const created = await db.select().from(systemSettings).where(eq(systemSettings.id, 1)).limit(1); return created[0]; }

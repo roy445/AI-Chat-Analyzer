@@ -1,0 +1,31 @@
+export type ErrorCatalogItem = { code: string; name: string; severity: "S0" | "S1" | "S2" | "S3" | "S4"; description: string };
+
+export const ERROR_CATALOG: ErrorCatalogItem[] = [
+  { code: "FILE-001", name: "檔案格式不支援", severity: "S3", description: "上傳的副檔名或檔案格式不在目前支援範圍內。" },
+  { code: "FILE-002", name: "平台格式無法辨識", severity: "S2", description: "檔案內容與所選平台的匯出格式不相符。" },
+  { code: "FILE-003", name: "檔案讀取失敗", severity: "S2", description: "瀏覽器無法讀取檔案，可能是檔案損毀或權限不足。" },
+  { code: "FILE-004", name: "檔案內容格式錯誤", severity: "S2", description: "檔案可以讀取，但內部欄位或訊息格式不完整。" },
+  { code: "FILE-005", name: "檔案內容為空", severity: "S3", description: "檔案沒有可供分析的訊息內容。" },
+  { code: "FILE-009", name: "聊天訊息不足", severity: "S3", description: "目前訊息數量不足以產生可靠的分析。" },
+  { code: "FILE-011", name: "聊天者不足", severity: "S3", description: "目前資料無法辨識至少兩位聊天者。" },
+  { code: "ANALYSIS-001", name: "分析服務已暫停", severity: "S1", description: "管理員暫時關閉了分析服務。" },
+  { code: "ANALYSIS-004", name: "分析資料不足", severity: "S2", description: "目前選取的期間或訊息不足以完成分析。" },
+  { code: "AI-001", name: "AI 分析服務已暫停", severity: "S1", description: "管理員暫時關閉了 AI 分析服務。" },
+  { code: "AI-004", name: "AI 設定錯誤", severity: "S1", description: "AI provider 或必要環境變數設定不完整。" },
+  { code: "AI-005", name: "AI 模型不存在", severity: "S1", description: "目前設定的模型名稱不存在或無法使用。" },
+  { code: "AI-006", name: "AI 分析錯誤", severity: "S1", description: "AI 服務無法完成這次分析，可能是請求格式或上游服務異常。" },
+  { code: "AI-010", name: "AI 服務暫時忙碌", severity: "S1", description: "AI 服務目前需求過高，重試與備援服務都未能完成。" },
+  { code: "AI-011", name: "AI 額度或速率限制", severity: "S1", description: "AI API 額度已用完、受到速率限制，或帳戶暫時無法繼續請求。" },
+  { code: "SHARE-001", name: "分享內容格式錯誤", severity: "S2", description: "要分享的報告資料格式不符合安全驗證。" },
+  { code: "SHARE-003", name: "分享資料表不存在", severity: "S1", description: "雲端資料庫尚未建立 shared_reports 資料表。" },
+  { code: "SHARE-004", name: "分享資料庫連線失敗", severity: "S1", description: "網站無法連線到 PostgreSQL 資料庫。" },
+  { code: "SHARE-009", name: "分享服務已暫停", severity: "S1", description: "管理員暫時關閉了分享服務。" },
+  { code: "SHARE-010", name: "分享寫入失敗", severity: "S1", description: "報告驗證成功，但儲存分享資料時發生資料庫錯誤。" },
+  { code: "ADMIN-001", name: "管理員登入失敗", severity: "S2", description: "管理員密碼不正確或尚未設定。" },
+  { code: "ADMIN-006", name: "管理員資料庫錯誤", severity: "S1", description: "後台設定或使用紀錄資料庫無法使用。" },
+  { code: "SYSTEM-001", name: "系統未知錯誤", severity: "S1", description: "系統遇到未分類的例外狀況。" },
+  { code: "SYSTEM-002", name: "郵件通知未設定", severity: "S3", description: "Gmail SMTP 尚未設定，錯誤回報無法寄出。" },
+  { code: "SYSTEM-003", name: "核心服務異常", severity: "S0", description: "核心服務可能影響網站主要功能，系統應暫停相關服務。" },
+];
+
+export function errorInfo(code: string) { return ERROR_CATALOG.find((item) => item.code === code) || { code, name: "未分類錯誤", severity: "S2" as const, description: "系統尚未提供這個錯誤代碼的詳細說明。" }; }

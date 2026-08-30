@@ -17,6 +17,15 @@ export const usageEvents = pgTable("usage_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const errorTestHistory = pgTable("error_test_history", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  severity: text("severity").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+});
+
 // Explicitly stores report aggregates only. Raw chat messages never enter this table.
 export const sharedReports = pgTable("shared_reports", {
   id: text("id").primaryKey(),
