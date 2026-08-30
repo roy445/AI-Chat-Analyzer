@@ -2,7 +2,7 @@ import { localAnalysis, minimizedReport, GeminiProvider, OpenRouterProvider } fr
 import type { AnalysisReport } from "@/lib/chat/types";
 import { errorResponse } from "@/lib/errors";
 import { notifyCritical } from "@/lib/critical-notify";
-import { getSystemSettings, recordUsage } from "@/lib/service-control";
+import { getSystemSettings, recordUsage, resolveRealError } from "@/lib/service-control";
 
 export const dynamic = "force-dynamic";
 
@@ -17,19 +17,19 @@ export async function POST(request: Request) {
     const report = body.report;
     const input = JSON.stringify(minimizedReport(report));
     const gemini = new GeminiProvider();
-    if (!settings.aiEnabled) { const result = { ...localAnalysis(report), provider: "local-summary" }; await recordUsage("analysis_complete"); return Response.json(result); }
+    if (!settings.aiEnabled) { const result = { ...localAnalysis(report), provider: "local-summary" }; await recordUsage("analysis_complete"); void resolveRealError("ANALYSIS-001"); return Response.json(result); }
     if (settings.testErrorCode?.startsWith("AI-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的 AI 錯誤測試。", 503, "S1");
     await recordUsage("ai_start");
     if (process.env.GEMINI_API_KEY?.trim()) {
-      try { const result = await gemini.analyze(input); await recordUsage("ai_complete"); await recordUsage("analysis_complete"); return Response.json(result); } catch (geminiError) {
+      try { const result = await gemini.analyze(input); await recordUsage("ai_complete"); await recordUsage("analysis_complete"); void resolveRealError("AI-010"); return Response.json(result); } catch (geminiError) {
         const message = geminiError instanceof Error ? geminiError.message : "";
         const canFallback = (message.startsWith("GEMINI_REQUEST_FAILED_503") || message.startsWith("GEMINI_REQUEST_FAILED_429")) && process.env.OPENROUTER_API_KEY?.trim();
         if (!canFallback) throw geminiError;
         console.warn("[ai/analyze] Gemini unavailable, switching to OpenRouter");
       }
     }
-    if (process.env.OPENROUTER_API_KEY?.trim()) { const result = await new OpenRouterProvider().analyze(input); await recordUsage("ai_complete"); await recordUsage("analysis_complete"); return Response.json(result); }
-    const result = { ...localAnalysis(report), provider: "local-summary" }; await recordUsage("analysis_complete"); return Response.json(result);
+    if (process.env.OPENROUTER_API_KEY?.trim()) { const result = await new OpenRouterProvider().analyze(input); await recordUsage("ai_complete"); await recordUsage("analysis_complete"); void resolveRealError("AI-010"); return Response.json(result); }
+    const result = { ...localAnalysis(report), provider: "local-summary" }; await recordUsage("analysis_complete"); void resolveRealError("ANALYSIS-001"); return Response.json(result);
   } catch (error) {
     const raw = error instanceof Error ? error.message : "";
     console.error("[ai/analyze] upstream failure", raw);

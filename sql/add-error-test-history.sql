@@ -29,8 +29,10 @@ CREATE TABLE IF NOT EXISTS announcement_history (
   level TEXT NOT NULL DEFAULT 'info',
   source TEXT NOT NULL DEFAULT 'manual',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  revoked_at TIMESTAMPTZ NULL
+  revoked_at TIMESTAMPTZ NULL,
+  expires_at TIMESTAMPTZ NULL
 );
+ALTER TABLE announcement_history ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NULL;
 CREATE INDEX IF NOT EXISTS announcement_history_created_at_idx ON announcement_history (created_at DESC);
 CREATE INDEX IF NOT EXISTS announcement_history_active_idx ON announcement_history (created_at DESC) WHERE revoked_at IS NULL;
 
@@ -40,6 +42,7 @@ CREATE INDEX IF NOT EXISTS usage_events_created_at_idx ON usage_events (created_
 CREATE INDEX IF NOT EXISTS usage_events_session_idx ON usage_events (session_id, created_at DESC);
 
 ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS test_error_code TEXT;
+ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS announcement_expires_at TIMESTAMPTZ NULL;
 ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS announcement_level TEXT NOT NULL DEFAULT 'info';
 ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 

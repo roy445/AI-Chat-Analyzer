@@ -10,7 +10,9 @@ export type UsageEventType =
 
 export async function getSystemSettings() {
   const rows = await db.select().from(systemSettings).where(eq(systemSettings.id, 1)).limit(1);
-  return rows[0] || { id: 1, analysisEnabled: true, aiEnabled: true, sharingEnabled: true, announcement: null, announcementLevel: "info", testErrorCode: null, updatedAt: new Date() };
+  const current = rows[0];
+  if (current?.announcementExpiresAt && current.announcementExpiresAt <= new Date()) { await db.update(systemSettings).set({ announcement: null, announcementLevel: "info", announcementExpiresAt: null, updatedAt: new Date() }).where(eq(systemSettings.id, 1)); return { ...current, announcement: null, announcementLevel: "info", announcementExpiresAt: null }; }
+  return current || { id: 1, analysisEnabled: true, aiEnabled: true, sharingEnabled: true, announcement: null, announcementLevel: "info", announcementExpiresAt: null, testErrorCode: null, updatedAt: new Date() };
 }
 
 export async function recordUsage(eventType: UsageEventType, sessionId?: string, page?: string) {
@@ -42,4 +44,18 @@ function publicAnnouncement(code: string) {
 export async function stopActiveError(code: string) {
   try { await db.update(errorTestHistory).set({ stoppedAt: new Date() }).where(and(eq(errorTestHistory.code, code), isNull(errorTestHistory.stoppedAt))); }
   catch (error) { console.error("[error-history] unable to stop error", error); }
+}
+
+export async function resolveRealError(code: string) {
+  try {
+    const now = new Date();
+    const active = await db.select({ id: errorTestHistory.id }).from(errorTestHistory).where(and(eq(errorTestHistory.code, code), eq(errorTestHistory.source, "real"), isNull(errorTestHistory.stoppedAt))).limit(1);
+    if (!active[0]) return;
+    await db.update(errorTestHistory).set({ stoppedAt: now }).where(eq(errorTestHistory.id, active[0].id));
+    await db.update(announcementHistory).set({ revokedAt: now }).where(and(eq(announcementHistory.source, "auto"), isNull(announcementHistory.revokedAt)));
+    const recovery = "服務已恢復正常，先前的錯誤已解除。感謝你的耐心等候。";
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    await db.update(systemSettings).set({ announcement: recovery, announcementLevel: "info", announcementExpiresAt: expiresAt, updatedAt: now }).where(eq(systemSettings.id, 1));
+    await db.insert(announcementHistory).values({ message: recovery, level: "info", source: "auto", expiresAt });
+  } catch (error) { console.error("[error-history] unable to resolve error", error); }
 }

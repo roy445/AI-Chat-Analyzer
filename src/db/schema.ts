@@ -7,6 +7,7 @@ export const systemSettings = pgTable("system_settings", {
   sharingEnabled: boolean("sharing_enabled").notNull().default(true),
   announcement: text("announcement"),
   announcementLevel: text("announcement_level").notNull().default("info"),
+  announcementExpiresAt: timestamp("announcement_expires_at", { withTimezone: true }),
   testErrorCode: text("test_error_code"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -32,6 +33,7 @@ export const announcementHistory = pgTable("announcement_history", {
   source: text("source").notNull().default("manual"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
 export const errorTestHistory = pgTable("error_test_history", {

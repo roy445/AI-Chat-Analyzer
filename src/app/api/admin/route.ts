@@ -17,27 +17,34 @@ export async function POST(request: Request) {
     if (body.action === "settings") {
       const current = await getSettings();
       const now = new Date();
+      let recoveryAnnouncement: string | null = null;
+      let recoveryExpiresAt: Date | null = null;
       if (body.testErrorCode === null && current.testErrorCode) {
         await db.update(errorTestHistory).set({ stoppedAt: now }).where(and(eq(errorTestHistory.code, current.testErrorCode), isNull(errorTestHistory.stoppedAt)));
         await db.update(announcementHistory).set({ revokedAt: now }).where(and(eq(announcementHistory.source, "auto"), isNull(announcementHistory.revokedAt)));
-        if (current.announcementLevel !== "info") await db.update(systemSettings).set({ announcement: null, announcementLevel: "info" }).where(eq(systemSettings.id, 1));
+        recoveryAnnouncement = "服務已恢復正常，先前的錯誤已解除。感謝你的耐心等候。";
+        recoveryExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        await db.insert(announcementHistory).values({ message: recoveryAnnouncement, level: "info", source: "auto", expiresAt: recoveryExpiresAt });
       }
       const announcementChanged = body.announcement !== undefined && body.announcement !== current.announcement;
       if (announcementChanged && body.announcement) {
         await db.update(announcementHistory).set({ revokedAt: now }).where(isNull(announcementHistory.revokedAt));
-        await db.insert(announcementHistory).values({ message: body.announcement.slice(0, 500), level: body.announcementLevel || current.announcementLevel, source: "manual" });
+        await db.insert(announcementHistory).values({ message: body.announcement.slice(0, 500), level: body.announcementLevel || current.announcementLevel, source: "manual", expiresAt: null });
       }
       if (announcementChanged && !body.announcement) await db.update(announcementHistory).set({ revokedAt: now }).where(isNull(announcementHistory.revokedAt));
-      await db.update(systemSettings).set({ analysisEnabled: body.analysisEnabled ?? current.analysisEnabled, aiEnabled: body.aiEnabled ?? current.aiEnabled, sharingEnabled: body.sharingEnabled ?? current.sharingEnabled, announcement: body.announcement?.slice(0, 500) ?? (body.testErrorCode === null ? null : current.announcement), announcementLevel: body.announcementLevel || (body.testErrorCode === null ? "info" : current.announcementLevel), testErrorCode: body.testErrorCode === undefined ? current.testErrorCode : body.testErrorCode, updatedAt: now }).where(eq(systemSettings.id, 1));
+      const nextAnnouncement = body.announcement !== undefined ? body.announcement.slice(0, 500) || null : recoveryAnnouncement ?? current.announcement;
+      const nextAnnouncementLevel = body.announcement !== undefined ? (body.announcement ? body.announcementLevel || current.announcementLevel : "info") : recoveryAnnouncement ? "info" : current.announcementLevel;
+      await db.update(systemSettings).set({ analysisEnabled: body.analysisEnabled ?? current.analysisEnabled, aiEnabled: body.aiEnabled ?? current.aiEnabled, sharingEnabled: body.sharingEnabled ?? current.sharingEnabled, announcement: nextAnnouncement, announcementLevel: nextAnnouncementLevel, announcementExpiresAt: body.announcement !== undefined && !body.announcement ? null : recoveryExpiresAt, testErrorCode: body.testErrorCode === undefined ? current.testErrorCode : body.testErrorCode, updatedAt: now }).where(eq(systemSettings.id, 1));
       return Response.json({ ok: true, settings: await getSettings() });
     }
     if (body.action === "simulate") {
       const code = body.eventType?.trim().toUpperCase(); if (!code || !/^[A-Z]+-\d{3}$/.test(code)) return errorResponse("ADMIN-004", "請選擇有效的錯誤代碼。", 400, "S2");
+      if (!(code.startsWith("ANALYSIS-") || code.startsWith("AI-") || code.startsWith("SHARE-"))) return errorResponse("ADMIN-004", "此錯誤代碼尚未接入可測試的使用者服務流程。", 400, "S2");
       const info = errorInfo(code); const current = await getSettings(); const now = new Date();
       if (current.testErrorCode) await db.update(errorTestHistory).set({ stoppedAt: now }).where(and(eq(errorTestHistory.code, current.testErrorCode), isNull(errorTestHistory.stoppedAt)));
       await db.update(announcementHistory).set({ revokedAt: now }).where(and(eq(announcementHistory.source, "auto"), isNull(announcementHistory.revokedAt)));
       const announcement = publicTestAnnouncement(code);
-      await db.update(systemSettings).set({ testErrorCode: code, announcement, announcementLevel: "warning", updatedAt: now }).where(eq(systemSettings.id, 1));
+      await db.update(systemSettings).set({ testErrorCode: code, announcement, announcementLevel: "warning", announcementExpiresAt: null, updatedAt: now }).where(eq(systemSettings.id, 1));
       await db.insert(errorTestHistory).values({ code, name: info.name, severity: info.severity, source: "test" });
       await db.insert(announcementHistory).values({ message: announcement, level: "warning", source: "auto" });
       return Response.json({ ok: true, simulated: code, name: info.name });

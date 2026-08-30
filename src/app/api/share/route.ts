@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { sharedReports } from "@/db/schema";
 import { errorResponse } from "@/lib/errors";
 import { notifyCritical } from "@/lib/critical-notify";
-import { getSystemSettings, recordUsage } from "@/lib/service-control";
+import { getSystemSettings, recordUsage, resolveRealError } from "@/lib/service-control";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     if (!isSafePayload(body)) return errorResponse("SHARE-001", "分享內容格式不正確。", 400, "S2");
     const id = randomBytes(18).toString("base64url");
     await db.insert(sharedReports).values({ id, payload: body });
+    void resolveRealError("SHARE-009");
     return Response.json({ id });
   } catch (error) {
     const dbError = error as { code?: string; message?: string; cause?: { code?: string; message?: string } };
