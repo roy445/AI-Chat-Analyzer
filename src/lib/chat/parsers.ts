@@ -146,6 +146,34 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+const MOJIBAKE_MARKERS = /[ÃÂâæçåèéêëïðñòóôõö÷øùúûü]/g;
+
+/** Repairs strings that were decoded as Latin-1 before their UTF-8 bytes were preserved. */
+function repairMojibake(value: string) {
+  if (!value || !MOJIBAKE_MARKERS.test(value)) return value;
+  MOJIBAKE_MARKERS.lastIndex = 0;
+  const bytes = Uint8Array.from(Array.from(value).map((character) => character.charCodeAt(0) & 0xff));
+  const repaired = new TextDecoder("utf-8").decode(bytes);
+  const originalScore = (value.match(MOJIBAKE_MARKERS) ?? []).length;
+  MOJIBAKE_MARKERS.lastIndex = 0;
+  const repairedScore = (repaired.match(MOJIBAKE_MARKERS) ?? []).length;
+  return repairedScore < originalScore ? repaired : value;
+}
+
+function decodeChatBytes(bytes: ArrayBuffer) {
+  const utf8 = new TextDecoder("utf-8").decode(bytes);
+  const replacementCount = (utf8.match(/\uFFFD/g) ?? []).length;
+  if (replacementCount > 0) {
+    try {
+      const legacy = new TextDecoder("big5").decode(bytes);
+      if ((legacy.match(/\uFFFD/g) ?? []).length < replacementCount) return legacy;
+    } catch {
+      // Big5 is not available in every runtime; UTF-8 remains the safe fallback.
+    }
+  }
+  return utf8;
+}
+
 function timestampFrom(value: unknown): string | null {
   if (typeof value === "number") {
     const ms = value > 10_000_000_000 ? value : value * 1000;
@@ -181,11 +209,11 @@ function walkJson(value: unknown, messages: NormalizedMessage[], index: { curren
   }
   const record = value as UnknownRecord;
   const senderRecord = record.sender as UnknownRecord | undefined;
-  const sender = stringValue(record.sender_name) || stringValue(record.from) || stringValue(record.sender) || stringValue(senderRecord?.name);
+  const sender = repairMojibake(stringValue(record.sender_name) || stringValue(record.from) || stringValue(record.sender) || stringValue(senderRecord?.name));
   const time = timestampFrom(record.timestamp_ms ?? record.timestamp ?? record.created_at ?? record.date);
   if (sender && time) {
     const media = mediaFromRecord(record);
-    const message = makeMessage(index.current++, sender, media.content, time, media.type, media.label || undefined);
+    const message = makeMessage(index.current++, sender, repairMojibake(media.content), time, media.type, media.label || undefined);
     messages.push(message);
     participants.set(message.sender_id, message.sender_name);
     return;
@@ -215,7 +243,7 @@ export async function parseChatFile(platform: Platform, file: File): Promise<Par
   if (!extension || !["txt", "json", "html", "htm"].includes(extension)) {
     throw new ChatParseError("unsupported", "目前支援 .txt、.json 或 .html 聊天檔案。");
   }
-  const text = await file.text();
+  const text = decodeChatBytes(await file.arrayBuffer());
   if (!text.trim()) throw new ChatParseError("empty", "這個檔案沒有可讀取的內容。");
   try {
     if (extension === "json") return parseJson(JSON.parse(text), platform);
