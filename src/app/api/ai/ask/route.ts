@@ -2,11 +2,16 @@ import { minimizedReport, GeminiProvider, OpenRouterProvider } from "@/lib/ai/pr
 import { localQuestionAnswer } from "@/lib/chat/v2";
 import type { AnalysisReport } from "@/lib/chat/types";
 import { errorResponse } from "@/lib/errors";
+import { getSystemSettings, recordUsage } from "@/lib/service-control";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const settings = await getSystemSettings();
+    if (!settings.aiEnabled) return errorResponse("AI-001", "AI 問答服務目前由管理員暫停，請稍後再試。", 503, "S1");
+    if (settings.testErrorCode?.startsWith("AI-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的 AI 錯誤測試。", 503, "S1");
+    await recordUsage("ai");
     const body = await request.json() as { report?: AnalysisReport; question?: string };
     const question = body.question?.trim();
     if (!body.report || !question || question.length > 240) return Response.json({ error: "請輸入一個具體的聊天問題。" }, { status: 400 });

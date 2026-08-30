@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sharedReports } from "@/db/schema";
 import { errorResponse } from "@/lib/errors";
 import { notifyCritical } from "@/lib/critical-notify";
+import { getSystemSettings, recordUsage } from "@/lib/service-control";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,10 @@ function isSafePayload(value: unknown): value is { report: unknown; ai?: unknown
 
 export async function POST(request: Request) {
   try {
+    const settings = await getSystemSettings();
+    if (!settings.sharingEnabled) return errorResponse("SHARE-009", "分享服務目前由管理員暫停，請稍後再試。", 503, "S1");
+    if (settings.testErrorCode?.startsWith("SHARE-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的分享錯誤測試。", 503, "S1");
+    await recordUsage("share");
     const body: unknown = await request.json();
     if (!isSafePayload(body)) return errorResponse("SHARE-001", "分享內容格式不正確。", 400, "S2");
     const id = randomBytes(18).toString("base64url");

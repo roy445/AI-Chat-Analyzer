@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity, Award, ArrowLeft, ArrowRight, BarChart3, BookOpen, Bot, CalendarDays, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3, Download, EyeOff, FileDown, FileText, Flame, Gauge, Image, Info, Link2, List, LockKeyhole, MessageCircle, Mic2, Moon, Network, Paperclip, RefreshCw, Send, Share2, ShieldCheck, Smile, Search, Sparkles, Target, Timer, TrendingUp, UploadCloud, UserRound, Users, Video, X, Zap,
+  Activity, Award, ArrowLeft, ArrowRight, BarChart3, BookOpen, Bot, CalendarDays, Check, ChevronDown, ChevronRight, CircleAlert, CircleCheck, Clock3, Download, EyeOff, FileDown, FileText, Flame, Gauge, Image, Info, Link2, List, LockKeyhole, MessageCircle, Mic2, Megaphone, Moon, Network, Paperclip, RefreshCw, Send, Share2, ShieldCheck, Smile, Search, Sparkles, Target, Timer, TrendingUp, UploadCloud, UserRound, Users, Video, X, Zap,
 } from "lucide-react";
 import { analyzeChat, formatMinutesForReport, PERIODS } from "@/lib/chat/analyzers";
 import { ChatParseError, parseChatFile, platformLabels } from "@/lib/chat/parsers";
@@ -50,6 +50,7 @@ function Logo({ small = false }: { small?: boolean }) { return <span className="
 function Avatar({ name, color = "blue" }: { name: string; color?: "blue" | "yellow" }) { return <span className={`avatar ${color}`}>{name.slice(0, 1).toUpperCase()}</span>; }
 function delay(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 function ErrorNotice({ error, code = "SYSTEM-001" }: { error: string; code?: string }) { const critical = ["AI-010", "AI-011", "SHARE-010", "SYSTEM-003"].includes(code); return <div className={`error-box error-box-detailed ${critical ? "error-box-critical" : ""}`} role="alert"><CircleAlert size={critical ? 23 : 17} style={{ flex: "0 0 auto" }} /><span><b>{critical ? "分析服務暫時停止" : "抱歉，遇到了一些錯誤。"}</b><br />{error}<br /><strong>錯誤代碼：{code}</strong><br /><Link className="error-report-link" href={`/report-error?code=${encodeURIComponent(code)}`}>回報錯誤，幫助建立者改善</Link></span></div>; }
+function ServiceAnnouncement() { const [notice, setNotice] = useState<{ announcement: string | null; announcementLevel: string } | null>(null); useEffect(() => { void fetch("/api/status").then((response) => response.ok ? response.json() : null).then(setNotice).catch(() => undefined); }, []); if (!notice?.announcement) return null; return <div className={`service-announcement ${notice.announcementLevel}`} role="status"><Megaphone size={22} /><div><strong>{notice.announcementLevel === "critical" ? "重要服務公告" : "服務公告"}</strong><p>{notice.announcement}</p></div></div>; }
 function prettyCount(value: number) { return value.toLocaleString("zh-TW"); }
 function percent(value: number) { return `${Math.round(value)}%`; }
 function shortName(name: string) { return name.length > 10 ? `${name.slice(0, 10)}…` : name; }
@@ -124,27 +125,27 @@ function ExternalLinkIcon() { return <ChevronRight size={14} style={{ verticalAl
 
 function Upload({ platform, onParsed, onBack }: { platform: Platform; onParsed: (result: ParseResult) => void; onBack: () => void }) {
   const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""); const [errorCode, setErrorCode] = useState("FILE-003");
   const [parsing, setParsing] = useState(false);
   const [progress, setProgress] = useState(8);
   const [phase, setPhase] = useState("正在讀取聊天紀錄……");
   const inputRef = useRef<HTMLInputElement>(null);
   const read = async (file?: File) => {
     if (!file) return;
-    setError(""); setParsing(true); setProgress(8);
+    setError(""); setErrorCode("FILE-003"); setParsing(true); setProgress(8);
     const startedAt = Date.now();
     try {
       setPhase("正在讀取聊天紀錄……"); setProgress(22); await delay(420); setPhase("正在整理訊息……"); setProgress(48);
       const result = await parseChatFile(platform, file);
       setPhase("正在檢查聊天者……"); setProgress(78); await delay(520); setPhase("準備分析工作區……"); setProgress(94); await delay(Math.max(0, 3000 - (Date.now() - startedAt))); setProgress(100); onParsed(result);
     } catch (caught) {
-      if (caught instanceof ChatParseError) setError(caught.message);
-      else setError("這個檔案目前無法辨識，請確認檔案完整後再試一次。");
+      if (caught instanceof ChatParseError) { setError(caught.message); setErrorCode(caught.code); }
+      else { setError("這個檔案目前無法辨識，請確認檔案完整後再試一次。"); setErrorCode("FILE-003"); }
       setParsing(false); setProgress(0);
     }
   };
   if (parsing) return <div className="flow-page analysis-page"><FlowHeader onBack={onBack} canBack platform={platform} /><main className="flow-main"><div className="surface-card loading-card analysis-loading"><div className="analysis-visual" aria-hidden="true"><span className="analysis-orbit orbit-one" /><span className="analysis-orbit orbit-two" /><span className="analysis-core"><Sparkles size={25} /></span><span className="analysis-dot dot-one" /><span className="analysis-dot dot-two" /><span className="analysis-dot dot-three" /></div><div className="analysis-copy"><span className="eyebrow">Local analysis in progress</span><h2>{phase}</h2><p className="muted">我們正在你的裝置上整理這段聊天，不會把原始檔案自動傳出去。</p><div className="progress-meter"><span style={{ width: `${progress}%` }} /></div><div className="progress-meter-label"><span>解析進度</span><b>{progress}%</b></div><div className="analysis-steps"><span className="analysis-step active"><i />讀取</span><span className="analysis-step active"><i />整理</span><span className="analysis-step active"><i />辨識</span><span className="analysis-step"><i />完成</span></div></div></div></main></div>;
-  return <div className="flow-page"><FlowHeader onBack={onBack} canBack platform={platform} /><main className="flow-main"><div className="flow-title"><span className="eyebrow">Step 03 / local import</span><h1>把聊天檔案放到這裡</h1><p>你的檔案會先在瀏覽器中解析，不會因為上傳檔案而自動傳送到伺服器。</p></div><div className="upload-panel"><div className={`dropzone ${dragging ? "dragging" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void read(event.dataTransfer.files?.[0]); }}><div><span className="upload-icon"><UploadCloud size={25} /></span><h3>拖曳檔案到這裡</h3><p>或從你的裝置選擇聊天檔案</p><button className="btn-primary" onClick={() => inputRef.current?.click()}>選擇檔案 <FileUpIcon /></button><input ref={inputRef} type="file" accept=".txt,.json,.html,.htm" hidden onChange={(event) => void read(event.target.files?.[0])} /></div></div><p className="file-hint">支援 {PLATFORM_META[platform].formats} · 檔案不會自動上傳</p>{error && <div className="error-box"><CircleAlert size={17} style={{ flex: "0 0 auto" }} /><span>{error}<br /><button className="nav-link" onClick={onBack}>查看支援格式與匯出教學</button></span></div>}<div className="notice" style={{ marginTop: 25 }}><ShieldCheck size={16} style={{ flex: "0 0 auto", marginTop: 2, color: "var(--mint)" }} /><span><b>隱私提醒</b><br />基本報告不需要登入，也不需要把原始聊天紀錄傳給我們。關閉分頁後，本機解析資料就會被清除。</span></div></div></main></div>;
+  return <div className="flow-page"><FlowHeader onBack={onBack} canBack platform={platform} /><main className="flow-main"><div className="flow-title"><span className="eyebrow">Step 03 / local import</span><h1>把聊天檔案放到這裡</h1><p>你的檔案會先在瀏覽器中解析，不會因為上傳檔案而自動傳送到伺服器。</p></div><div className="upload-panel"><div className={`dropzone ${dragging ? "dragging" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); void read(event.dataTransfer.files?.[0]); }}><div><span className="upload-icon"><UploadCloud size={25} /></span><h3>拖曳檔案到這裡</h3><p>或從你的裝置選擇聊天檔案</p><button className="btn-primary" onClick={() => inputRef.current?.click()}>選擇檔案 <FileUpIcon /></button><input ref={inputRef} type="file" accept=".txt,.json,.html,.htm" hidden onChange={(event) => void read(event.target.files?.[0])} /></div></div><p className="file-hint">支援 {PLATFORM_META[platform].formats} · 檔案不會自動上傳</p>{error && <><ErrorNotice error={error} code={errorCode} /><button className="nav-link" onClick={onBack}>查看支援格式與匯出教學</button></>}<div className="notice" style={{ marginTop: 25 }}><ShieldCheck size={16} style={{ flex: "0 0 auto", marginTop: 2, color: "var(--mint)" }} /><span><b>隱私提醒</b><br />基本報告不需要登入，也不需要把原始聊天紀錄傳給我們。關閉分頁後，本機解析資料就會被清除。</span></div></div></main></div>;
 }
 function FileUpIcon() { return <ArrowRight size={15} />; }
 
@@ -286,7 +287,7 @@ export default function ChatAnalyzer() {
     if (selectedMessages.length < 2 || ids.size < 2 || !ids.has(nextMeId)) { window.alert("這個期間內的聊天資料不足兩位聊天者，請調整日期範圍後再試。"); return; }
     setCurrentMeId(nextMeId); setCurrentRange(nextRange); setReport(analyzeChat(selectedMessages, platform, nextMeId, parsed.warnings));
   };
-  if (step === "home") return <div ref={motionScope} className="motion-root"><HomePage onStart={start} /></div>;
+  if (step === "home") return <div ref={motionScope} className="motion-root"><ServiceAnnouncement /><HomePage onStart={start} /></div>;
   if (step === "platform") return <div ref={motionScope} className="motion-root"><PlatformPicker onSelect={(value) => { setPlatform(value); setStep("guide"); }} onBack={() => setStep("home")} /></div>;
   if (step === "guide" && platform) return <div ref={motionScope} className="motion-root"><Guide platform={platform} onReady={() => setStep("upload")} onBack={() => setStep("platform")} /></div>;
   if (step === "upload" && platform) return <div ref={motionScope} className="motion-root"><Upload platform={platform} onParsed={(value) => { setParsed(value); setStep("identify"); }} onBack={() => setStep("guide")} /></div>;

@@ -2,16 +2,24 @@ import { localAnalysis, minimizedReport, GeminiProvider, OpenRouterProvider } fr
 import type { AnalysisReport } from "@/lib/chat/types";
 import { errorResponse } from "@/lib/errors";
 import { notifyCritical } from "@/lib/critical-notify";
+import { getSystemSettings, recordUsage } from "@/lib/service-control";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const settings = await getSystemSettings();
+    if (!settings.analysisEnabled) return errorResponse("ANALYSIS-001", "分析服務目前由管理員暫停，請稍後再試。", 503, "S1");
+    if (settings.testErrorCode?.startsWith("ANALYSIS-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的分析錯誤測試。", 503, "S1");
+    await recordUsage("analysis");
     const body = await request.json() as { report?: AnalysisReport };
     if (!body.report || !body.report.overview || !body.report.initiative) return Response.json({ error: "分析資料不足。" }, { status: 400 });
     const report = body.report;
     const input = JSON.stringify(minimizedReport(report));
     const gemini = new GeminiProvider();
+    if (!settings.aiEnabled) return Response.json({ ...localAnalysis(report), provider: "local-summary" });
+    if (settings.testErrorCode?.startsWith("AI-")) return errorResponse(settings.testErrorCode, "這是管理員啟用的 AI 錯誤測試。", 503, "S1");
+    await recordUsage("ai");
     if (process.env.GEMINI_API_KEY?.trim()) {
       try { return Response.json(await gemini.analyze(input)); } catch (geminiError) {
         const message = geminiError instanceof Error ? geminiError.message : "";
