@@ -24,13 +24,12 @@ function safeFallback(report: AnalysisReport): AiAnalysis {
 
 const SYSTEM_PROMPT = "你是繁體中文聊天互動分析助手。只能根據輸入的匿名化統計與摘要回答，不可臆測未提供的內容，不可診斷心理，不可判定喜歡或討厭。每項推測使用可能、疑似、從聊天紀錄來看。只輸出有效 JSON，不要 Markdown code fence。JSON keys: summary, atmosphere, observations(array), cautions(array), confidence(number 0-100), provider。";
 
+function wait(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
 export class GeminiProvider implements AiProvider {
   name = "Gemini";
 
-  async analyze(input: string) {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
-    const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
+  private async request(input: string, model: string, apiKey: string) {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -50,7 +49,34 @@ export class GeminiProvider implements AiProvider {
       }
       throw new Error(`GEMINI_REQUEST_FAILED_${response.status}:${detail.slice(0, 180)}`);
     }
-    const json = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    return response.json() as Promise<{ candidates?: { content?: { parts?: { text?: string }[] } }[] }>;
+  }
+
+  async analyze(input: string) {
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
+    const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.7-flash";
+    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-3.6-flash";
+    let json: { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null = null;
+    let lastError: unknown;
+    for (const model of [primaryModel, fallbackModel]) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          json = await this.request(input, model, apiKey);
+          break;
+        } catch (error) {
+          lastError = error;
+          const message = error instanceof Error ? error.message : "";
+          const retryable = message.startsWith("GEMINI_REQUEST_FAILED_503") || message.startsWith("GEMINI_REQUEST_FAILED_429");
+          if (!retryable || attempt === 1) break;
+          await wait(650 * (attempt + 1));
+        }
+      }
+      if (json) break;
+      const errorMessage = lastError instanceof Error ? lastError.message : "";
+      if (!errorMessage.startsWith("GEMINI_REQUEST_FAILED_503") && !errorMessage.startsWith("GEMINI_REQUEST_FAILED_429")) break;
+    }
+    if (!json) throw lastError instanceof Error ? lastError : new Error("GEMINI_REQUEST_FAILED_503");
     const content = json.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
     if (!content) throw new Error("AI_EMPTY_RESPONSE");
     const parsed = JSON.parse(content) as Partial<AiAnalysis>;
