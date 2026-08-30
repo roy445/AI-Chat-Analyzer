@@ -548,3 +548,11 @@ body::before { content: ""; position: fixed; z-index: -2; inset: 0; pointer-even
 .analysis-step.active i { border-color: #7788e7; background: #7788e7; box-shadow: 0 0 0 4px #eff0ff; }
 
 @media (prefers-reduced-motion: reduce) { body::before { display: none; } }
+
+/* User-provided LINE app icon: preserve the original artwork and proportions. */
+.platform-logo.logo-line, .platform-logo.logo-messenger { background: transparent; box-shadow: none; }
+.platform-logo.logo-line .platform-logo-image { padding: 0; border-radius: 17px; }
+.platform-logo.logo-messenger .platform-logo-image { padding: 0; border-radius: 17px; }
+.platform-logo.logo-instagram { background: transparent; box-shadow: none; }
+.platform-logo.logo-instagram .platform-logo-image { padding: 0; border-radius: 17px; }
+
