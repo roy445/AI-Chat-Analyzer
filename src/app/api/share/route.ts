@@ -4,11 +4,12 @@ import { sharedReports } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
-function isSafePayload(value: unknown): value is { report: unknown; ai?: unknown; mode?: "full" | "recap" | "achievements" } {
+function isSafePayload(value: unknown): value is { report: unknown; ai?: unknown; mode?: "full" | "recap" | "achievements"; sections?: string[]; anonymous?: boolean } {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   const mode = record.mode;
-  return Boolean(record.report) && (!mode || mode === "full" || mode === "recap" || mode === "achievements") && JSON.stringify(value).length < 900_000;
+  const sections = record.sections;
+  return Boolean(record.report) && (!mode || mode === "full" || mode === "recap" || mode === "achievements") && (!sections || (Array.isArray(sections) && sections.every((item) => typeof item === "string") && sections.length <= 20)) && (!record.anonymous || typeof record.anonymous === "boolean") && JSON.stringify(value).length < 900_000;
 }
 
 export async function POST(request: Request) {

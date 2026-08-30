@@ -19,10 +19,17 @@ function safeFallback(report: AnalysisReport): AiAnalysis {
       `最常使用的 Emoji 是 ${report.emoji.byEmoji[0]?.emoji ?? "—"}，它只代表使用習慣，不代表固定情緒。`,
     ],
     cautions: ["這是根據聊天紀錄的推測，不代表任何一方的真實想法。", "沒有訊息不等於已讀，也不代表對方當下的情緒或意圖。"],
+    keyFindings: [initiative, topic, `這份紀錄共包含 ${report.overview.total.toLocaleString()} 則訊息，涵蓋 ${report.overview.durationDays} 天。`, `最活躍時段集中在 ${report.overview.activeHour}。`, `最活躍日期是 ${report.overview.activeDate}。`, `資料品質為「${report.quality.confidence}」，請搭配資料品質頁一起閱讀。`],
+    communicationStyle: [`訊息量分布為你 ${report.overview.myMessages.toLocaleString()} 則、對方 ${report.overview.theirMessages.toLocaleString()} 則。`, `你的回覆中位數約 ${report.response.me.median || 0} 分鐘，對方約 ${report.response.them.median || 0} 分鐘。`, `主動程度分布為你 ${report.initiative.me}%、對方 ${report.initiative.them}%。`, `最常使用的詞語與 Emoji 反映的是聊天習慣，不等於固定個性。`, "對話節奏應搭配日期範圍與資料完整度判讀。"],
+    emotionalSignals: [report.emoji.total > 10 ? `紀錄中共出現 ${report.emoji.total} 個 Emoji，顯示文字以外存在語氣訊號。` : "Emoji 訊號較少，無法只靠 Emoji 推斷情緒。", report.events.some((event) => event.type === "conflict") ? "事件資料中出現疑似語氣轉折，仍需要完整上下文確認。" : "目前沒有足夠連續訊號標記疑似衝突。", "情緒趨勢只描述文字訊號，不能代表對方真實感受。", `最常見的 Emoji 是 ${report.emoji.byEmoji[0]?.emoji ?? "—"}。`, "沒有訊息的時段不代表冷淡、已讀或特定意圖。"],
+    strengths: ["雙方都在這段紀錄中留下可分析的互動訊號。", `聊天最活躍時段為 ${report.overview.activeHour}，代表部分互動具有穩定時間分布。`, `目前已整理出 ${report.topics.length} 個文字主題，可作為回顧對話的入口。`, "報告同時提供客觀統計與推測型指標，方便交叉閱讀。"],
+    frictionPoints: [report.events.some((event) => event.type === "conflict") ? "疑似衝突事件需要回到原始上下文核對，不能只看標籤。" : "目前沒有足夠資料支持明確的衝突結論。", `最長沉默約 ${report.v2.silence.longest.hours.toFixed(1)} 小時，應先確認資料是否完整。`, "回覆速度差異可能受到工作、睡眠與時區影響。", "詞頻與訊息量差異不能單獨解讀成關係中的優劣。"],
+    actionableSuggestions: ["先用時間範圍篩選功能比較不同期間，不要把整段紀錄視為單一狀態。", "查看原始對話上下文，再判斷疑似事件是否符合你的實際記憶。", "把高頻主題當作開啟對話的線索，而不是對彼此貼標籤。", "若要分享，建議只選擇必要類別並優先使用匿名模式。", "定期重新分析新增紀錄，觀察變化而不是只看單次分數。"],
+    evidence: [report.initiative.basis[0] ?? "主動程度由對話開啟與互動行為計算。", `訊息總量：${report.overview.total.toLocaleString()} 則。`, `日期範圍：${report.overview.startDate} 至 ${report.overview.endDate}。`, `最常聊天時段：${report.overview.activeHour}。`, `最常使用 Emoji：${report.emoji.byEmoji[0]?.emoji ?? "—"}。`, `資料品質：${report.quality.note}`],
   };
 }
 
-const SYSTEM_PROMPT = "你是繁體中文聊天互動分析助手。只能根據輸入的匿名化統計與摘要回答，不可臆測未提供的內容，不可診斷心理，不可判定喜歡或討厭。每項推測使用可能、疑似、從聊天紀錄來看。只輸出有效 JSON，不要 Markdown code fence。JSON keys: summary, atmosphere, observations(array), cautions(array), confidence(number 0-100), provider。";
+const SYSTEM_PROMPT = "你是繁體中文聊天互動分析助手。只能根據輸入的匿名化統計與摘要回答，不可臆測未提供的內容，不可診斷心理，不可判定喜歡或討厭。每項推測使用可能、疑似、從聊天紀錄來看。請做超詳細但清楚的分析，抓出所有可由資料支持的重點，避免空泛重複。只輸出有效 JSON，不要 Markdown code fence。JSON keys: summary(string), atmosphere(string), observations(string[] 至少 8 項), cautions(string[]), confidence(number 0-100), provider(string), keyFindings(string[] 至少 6 項), communicationStyle(string[] 至少 5 項), emotionalSignals(string[] 至少 5 項), strengths(string[] 至少 4 項), frictionPoints(string[] 至少 4 項), actionableSuggestions(string[] 至少 5 項), evidence(string[] 至少 6 項)。每個陣列項目都要是完整句子，並引用輸入中的統計或可觀察訊號，不得捏造聊天原文。";
 
 function wait(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -85,8 +92,15 @@ export class GeminiProvider implements AiProvider {
       summary: typeof parsed.summary === "string" ? parsed.summary : "目前無法整理出摘要。",
       atmosphere: typeof parsed.atmosphere === "string" ? parsed.atmosphere : "目前無法可靠判斷整體氣氛。",
       observations: Array.isArray(parsed.observations) ? parsed.observations.filter((item): item is string => typeof item === "string").slice(0, 6) : [],
-      cautions: Array.isArray(parsed.cautions) ? parsed.cautions.filter((item): item is string => typeof item === "string").slice(0, 4) : [],
+      cautions: Array.isArray(parsed.cautions) ? parsed.cautions.filter((item): item is string => typeof item === "string").slice(0, 6) : [],
       confidence: typeof parsed.confidence === "number" ? Math.max(0, Math.min(100, Math.round(parsed.confidence))) : 50,
+      keyFindings: Array.isArray(parsed.keyFindings) ? parsed.keyFindings.filter((item): item is string => typeof item === "string").slice(0, 10) : [],
+      communicationStyle: Array.isArray(parsed.communicationStyle) ? parsed.communicationStyle.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+      emotionalSignals: Array.isArray(parsed.emotionalSignals) ? parsed.emotionalSignals.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+      frictionPoints: Array.isArray(parsed.frictionPoints) ? parsed.frictionPoints.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+      actionableSuggestions: Array.isArray(parsed.actionableSuggestions) ? parsed.actionableSuggestions.filter((item): item is string => typeof item === "string").slice(0, 8) : [],
+      evidence: Array.isArray(parsed.evidence) ? parsed.evidence.filter((item): item is string => typeof item === "string").slice(0, 10) : [],
     } satisfies AiAnalysis;
   }
 }

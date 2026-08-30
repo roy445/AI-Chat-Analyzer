@@ -143,6 +143,13 @@ export type AiAnalysis = {
   cautions: string[];
   confidence: number;
   provider: string;
+  keyFindings?: string[];
+  communicationStyle?: string[];
+  emotionalSignals?: string[];
+  strengths?: string[];
+  frictionPoints?: string[];
+  actionableSuggestions?: string[];
+  evidence?: string[];
 };
 
 export type ShareMode = "full" | "recap" | "achievements";
@@ -150,5 +157,7 @@ export type SharedReport = {
   report: AnalysisReport;
   ai?: AiAnalysis | null;
   mode?: ShareMode;
+  sections?: string[];
+  anonymous?: boolean;
   shareId?: string;
 };
