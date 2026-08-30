@@ -13,6 +13,9 @@ export class ChatParseError extends Error {
     super(message);
     this.name = "ChatParseError";
   }
+  get code() {
+    return this.kind === "empty" ? "FILE-005" : this.kind === "format" ? "FILE-004" : this.kind === "participants" ? "FILE-011" : "FILE-002";
+  }
 }
 
 const DATE_HEADER = /^(\d{4})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})[.]?(?:\s+[^\d].*)?$/;
