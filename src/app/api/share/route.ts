@@ -18,7 +18,12 @@ export async function POST(request: Request) {
     const id = randomBytes(18).toString("base64url");
     await db.insert(sharedReports).values({ id, payload: body });
     return Response.json({ id });
-  } catch {
-    return Response.json({ error: "目前無法建立分享報告，請稍後再試。" }, { status: 500 });
+  } catch (error) {
+    const dbError = error as { code?: string; message?: string };
+    console.error("[share] database failure", dbError.code || "UNKNOWN", dbError.message || "");
+    if (dbError.code === "42P01") return Response.json({ error: "分享資料表尚未建立，請先執行 Drizzle migration／push，再重新部署。" }, { status: 500 });
+    if (dbError.code === "28P01" || dbError.code === "3D000") return Response.json({ error: "資料庫帳號或資料庫名稱無效，請檢查 Vercel 的 DATABASE_URL。" }, { status: 500 });
+    if (dbError.code === "ENOTFOUND" || dbError.code === "ECONNREFUSED" || dbError.code === "08001") return Response.json({ error: "無法連線到 PostgreSQL，請檢查 DATABASE_URL、SSL 設定與資料庫是否允許外部連線。" }, { status: 500 });
+    return Response.json({ error: "目前無法建立分享報告，請查看 Vercel Function Logs 的 [share] database failure 詳細錯誤。" }, { status: 500 });
   }
 }
