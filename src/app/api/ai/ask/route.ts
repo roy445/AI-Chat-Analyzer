@@ -15,7 +15,12 @@ export async function POST(request: Request) {
       return Response.json({ answer: result.summary, provider: result.provider, confidence: result.confidence });
     }
     return Response.json({ answer: localQuestionAnswer(body.report, question), provider: "local-summary", confidence: body.report.v2.quality.completeness === "高" ? 72 : 43 });
-  } catch {
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : "";
+    console.error("[ai/ask] upstream failure", raw);
+    if (raw.startsWith("AI_REQUEST_FAILED_401") || raw.startsWith("AI_REQUEST_FAILED_403")) return Response.json({ error: "OpenAI API 金鑰無效或沒有權限，請到 Vercel 檢查 OPENAI_API_KEY。" }, { status: 503 });
+    if (raw.startsWith("AI_REQUEST_FAILED_404") || raw.startsWith("AI_REQUEST_FAILED_400")) return Response.json({ error: "AI 模型設定不相容，請將 OPENAI_MODEL 設為 gpt-4o-mini 後重新部署。" }, { status: 503 });
+    if (raw.startsWith("AI_REQUEST_FAILED_429")) return Response.json({ error: "OpenAI API 暫時達到速率或使用量限制，請檢查 API 額度與帳務設定後再試。" }, { status: 503 });
     return Response.json({ error: "AI 問答暫時無法完成，請稍後再試。" }, { status: 503 });
   }
 }

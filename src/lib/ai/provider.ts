@@ -27,8 +27,8 @@ export class OpenAIProvider implements AiProvider {
 
   async analyze(input: string) {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
-    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    if (!apiKey?.trim()) throw new Error("AI_NOT_CONFIGURED");
+    const model = process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini";
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -42,7 +42,16 @@ export class OpenAIProvider implements AiProvider {
         ],
       }),
     });
-    if (!response.ok) throw new Error("AI_REQUEST_FAILED");
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const errorJson = await response.json() as { error?: { message?: string; code?: string } };
+        detail = errorJson.error?.message || errorJson.error?.code || "";
+      } catch {
+        detail = await response.text().catch(() => "");
+      }
+      throw new Error(`AI_REQUEST_FAILED_${response.status}:${detail.slice(0, 180)}`);
+    }
     const json = await response.json() as { choices?: { message?: { content?: string } }[] };
     const content = json.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI_EMPTY_RESPONSE");

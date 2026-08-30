@@ -572,4 +572,13 @@ body { color: #17213d; }
 .analysis-step.active { color: #3f4d69; }
 .error-box { color: #913d35; }
 
+/* Never allow light cards to inherit white text; preserve white only on intentional dark surfaces. */
+.surface-card:not(.recap), .surface-card:not(.recap) h1, .surface-card:not(.recap) h2, .surface-card:not(.recap) h3, .surface-card:not(.recap) h4, .surface-card:not(.recap) h5, .surface-card:not(.recap) strong, .surface-card:not(.recap) b { color: #17213d; }
+.surface-card:not(.recap) p, .surface-card:not(.recap) li, .surface-card:not(.recap) span { color: #52627d; }
+.surface-card:not(.recap) .btn-primary, .surface-card:not(.recap) .ai-symbol, .surface-card:not(.recap) .avatar, .surface-card:not(.recap) .bubble.right { color: #fff; }
+.recap, .recap h3, .recap p, .recap span, .recap strong, .recap .eyebrow { color: #fff; }
+.recap p { color: #d6e2fc; }
+.recap .eyebrow, .recap .recap-item span { color: #c1d7ff; }
+
+
 
