@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { db } from "@/db";
 import { sharedReports } from "@/db/schema";
+import { errorResponse } from "@/lib/errors";
+import { notifyCritical } from "@/lib/critical-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ function isSafePayload(value: unknown): value is { report: unknown; ai?: unknown
 export async function POST(request: Request) {
   try {
     const body: unknown = await request.json();
-    if (!isSafePayload(body)) return Response.json({ error: "分享內容格式不正確。" }, { status: 400 });
+    if (!isSafePayload(body)) return errorResponse("SHARE-001", "分享內容格式不正確。", 400, "S2");
     const id = randomBytes(18).toString("base64url");
     await db.insert(sharedReports).values({ id, payload: body });
     return Response.json({ id });
@@ -25,9 +27,10 @@ export async function POST(request: Request) {
     const code = cause.code || dbError.code || "UNKNOWN";
     const detail = cause.message || dbError.message || "";
     console.error("[share] database failure", code, detail);
-    if (code === "42P01") return Response.json({ error: "分享資料表尚未建立，請先執行 Drizzle migration／push，再重新部署。" }, { status: 500 });
-    if (code === "28P01" || code === "3D000") return Response.json({ error: "資料庫帳號或資料庫名稱無效，請檢查 Vercel 的 DATABASE_URL。" }, { status: 500 });
-    if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "08001") return Response.json({ error: "無法連線到 PostgreSQL，請檢查 DATABASE_URL、SSL 設定與資料庫是否允許外部連線。" }, { status: 500 });
-    return Response.json({ error: "目前無法建立分享報告，請查看 Vercel Function Logs 的 [share] database failure 詳細錯誤。" }, { status: 500 });
+    notifyCritical(code === "42P01" ? "SHARE-003" : "SHARE-009", `${code} ${detail}`);
+    if (code === "42P01") return errorResponse("SHARE-003", "分享資料表尚未建立，請先在雲端資料庫執行建表 SQL，再重新部署。", 500, "S1");
+    if (code === "28P01" || code === "3D000") return errorResponse("SHARE-005", "資料庫帳號或資料庫名稱無效，請檢查 Vercel 的 DATABASE_URL。", 500, "S1");
+    if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "08001") return errorResponse("SHARE-004", "無法連線到 PostgreSQL，請檢查 DATABASE_URL、SSL 設定與資料庫是否允許外部連線。", 500, "S1");
+    return errorResponse("SHARE-009", "目前無法建立分享報告，請稍後再試或回報錯誤代碼。", 500, "S1");
   }
 }

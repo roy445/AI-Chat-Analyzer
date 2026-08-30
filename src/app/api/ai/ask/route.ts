@@ -1,6 +1,7 @@
 import { minimizedReport, GeminiProvider, OpenRouterProvider } from "@/lib/ai/provider";
 import { localQuestionAnswer } from "@/lib/chat/v2";
 import type { AnalysisReport } from "@/lib/chat/types";
+import { errorResponse } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,12 @@ export async function POST(request: Request) {
   } catch (error) {
     const raw = error instanceof Error ? error.message : "";
     console.error("[ai/ask] upstream failure", raw);
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_401") || raw.startsWith("GEMINI_REQUEST_FAILED_403")) return Response.json({ error: "Gemini API 金鑰無效或沒有權限，請到 Vercel 檢查 GEMINI_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_404") || raw.startsWith("GEMINI_REQUEST_FAILED_400")) return Response.json({ error: "Gemini 模型設定不相容，請將 GEMINI_MODEL 設為 gemini-3.7-flash 後重新部署。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_429")) return Response.json({ error: "Gemini API 暫時達到速率或使用量限制，且沒有可用的備援 AI；請稍後再試或設定 OPENROUTER_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_503")) return Response.json({ error: "Gemini 目前需求過高，且沒有可用的備援 AI；請稍後再試或設定 OPENROUTER_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_")) return Response.json({ error: "OpenRouter 暫時無法完成問答，請稍後再試。" }, { status: 503 });
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_401") || raw.startsWith("GEMINI_REQUEST_FAILED_403")) return errorResponse("AI-002", "Gemini API 金鑰無效或沒有權限，請到 Vercel 檢查 GEMINI_API_KEY。", 503, "S1");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_404")) return errorResponse("AI-003", "Gemini 模型不存在或目前無法使用，請檢查 GEMINI_MODEL。", 503, "S1");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_400")) return errorResponse("AI-007", "Gemini 請求格式或模型設定不相容。", 503, "S2");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_429")) return errorResponse("AI-005", "Gemini API 暫時達到速率或使用量限制，系統已嘗試備援。", 503, "S2");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_503")) return errorResponse("AI-010", "Gemini 目前需求過高且備援 AI 也無法完成問答，服務暫時停止。", 503, "S1");
+    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_")) return errorResponse("AI-010", "Gemini 與 OpenRouter 都無法完成問答，服務暫時停止。", 503, "S1");
     return Response.json({ error: "AI 問答暫時無法完成，請稍後再試。" }, { status: 503 });
   }
 }

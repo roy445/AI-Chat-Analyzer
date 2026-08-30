@@ -1,5 +1,7 @@
 import { localAnalysis, minimizedReport, GeminiProvider, OpenRouterProvider } from "@/lib/ai/provider";
 import type { AnalysisReport } from "@/lib/chat/types";
+import { errorResponse } from "@/lib/errors";
+import { notifyCritical } from "@/lib/critical-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +25,15 @@ export async function POST(request: Request) {
   } catch (error) {
     const raw = error instanceof Error ? error.message : "";
     console.error("[ai/analyze] upstream failure", raw);
-    if (raw === "AI_NOT_CONFIGURED") return Response.json({ error: "AI 服務尚未設定，請在 Vercel 設定 GEMINI_API_KEY 後重新部署。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_401") || raw.startsWith("GEMINI_REQUEST_FAILED_403")) return Response.json({ error: "Gemini API 金鑰無效或沒有權限，請到 Vercel 檢查 GEMINI_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_404")) return Response.json({ error: "指定的 Gemini 模型不存在或目前無法使用，請將 GEMINI_MODEL 設為 gemini-3.7-flash 後重新部署。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_429")) return Response.json({ error: "Gemini API 暫時達到速率或使用量限制，請檢查 Google AI Studio 的額度與帳務設定後再試。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_400")) return Response.json({ error: "Gemini 請求格式或模型設定不相容，請確認 GEMINI_MODEL 設為 gemini-3.7-flash。" }, { status: 503 });
-    if (raw.startsWith("GEMINI_REQUEST_FAILED_")) return Response.json({ error: "Gemini 暫時拒絕這次請求，且沒有可用的備援 AI。請稍後再試或設定 OPENROUTER_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_401") || raw.startsWith("OPENROUTER_REQUEST_FAILED_403")) return Response.json({ error: "OpenRouter API 金鑰無效或沒有權限，請檢查 OPENROUTER_API_KEY。" }, { status: 503 });
-    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_")) return Response.json({ error: "OpenRouter 暫時無法完成分析，請稍後再試或更換 OPENROUTER_MODEL。" }, { status: 503 });
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_") || raw.startsWith("OPENROUTER_REQUEST_FAILED_")) notifyCritical("AI-010", raw);
+    if (raw === "AI_NOT_CONFIGURED") return errorResponse("AI-001", "AI 服務尚未設定，請在 Vercel 設定 GEMINI_API_KEY 或 OPENROUTER_API_KEY。", 503, "S1");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_401") || raw.startsWith("GEMINI_REQUEST_FAILED_403")) return errorResponse("AI-002", "Gemini API 金鑰無效或沒有權限，請到 Vercel 檢查 GEMINI_API_KEY。", 503, "S1");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_404")) return errorResponse("AI-003", "指定的 Gemini 模型不存在或目前無法使用，請檢查 GEMINI_MODEL。", 503, "S1");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_429")) return errorResponse("AI-005", "Gemini API 暫時達到速率或使用量限制，系統已嘗試備援；請稍後再試。", 503, "S2");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_400")) return errorResponse("AI-007", "Gemini 請求格式或模型設定不相容，請檢查模型與 JSON 設定。", 503, "S2");
+    if (raw.startsWith("GEMINI_REQUEST_FAILED_")) return errorResponse("AI-010", "Gemini 與備援 AI 都無法完成分析，分析服務暫時停止。", 503, "S1");
+    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_401") || raw.startsWith("OPENROUTER_REQUEST_FAILED_403")) return errorResponse("AI-002", "OpenRouter API 金鑰無效或沒有權限，請檢查 OPENROUTER_API_KEY。", 503, "S1");
+    if (raw.startsWith("OPENROUTER_REQUEST_FAILED_")) return errorResponse("AI-010", "Gemini 與 OpenRouter 都無法完成分析，分析服務暫時停止。", 503, "S1");
     return Response.json({ error: "AI 暫時無法完成分析，請稍後再試。" }, { status: 503 });
   }
 }
