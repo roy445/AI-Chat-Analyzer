@@ -14,7 +14,18 @@ export const systemSettings = pgTable("system_settings", {
 export const usageEvents = pgTable("usage_events", {
   id: serial("id").primaryKey(),
   eventType: text("event_type").notNull(),
+  sessionId: text("session_id"),
+  page: text("page"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const announcementHistory = pgTable("announcement_history", {
+  id: serial("id").primaryKey(),
+  message: text("message").notNull(),
+  level: text("level").notNull().default("info"),
+  source: text("source").notNull().default("manual"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
 
 export const errorTestHistory = pgTable("error_test_history", {

@@ -12,6 +12,7 @@ import { ChatParseError, parseChatFile, platformLabels } from "@/lib/chat/parser
 import type { AiAnalysis, AnalysisReport, NormalizedMessage, ParseResult, Platform } from "@/lib/chat/types";
 import { Achievements, AskAi, Balance, ConversationDrive, EmotionTrend, HeatmapV2, Highlights, Links, MemorySearch, Quality, Rhythm, Silence, Similarity, TopicLifecycle } from "./v2-sections";
 import { useGsapMotion } from "./use-gsap-motion";
+import { errorInfo } from "@/lib/error-catalog";
 
 type FlowStep = "home" | "platform" | "guide" | "upload" | "identify" | "report";
 type RangePreset = "all" | "thisYear" | "lastYear" | "last12" | "custom";
@@ -49,8 +50,10 @@ const mediaItems = [
 function Logo({ small = false }: { small?: boolean }) { return <span className="brand-mark"><span className="brand-icon" />{!small && <span>AI Chat Analyzer</span>}</span>; }
 function Avatar({ name, color = "blue" }: { name: string; color?: "blue" | "yellow" }) { return <span className={`avatar ${color}`}>{name.slice(0, 1).toUpperCase()}</span>; }
 function delay(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-function ErrorNotice({ error, code = "SYSTEM-001" }: { error: string; code?: string }) { const critical = ["AI-010", "AI-011", "SHARE-010", "SYSTEM-003"].includes(code); return <div className={`error-box error-box-detailed ${critical ? "error-box-critical" : ""}`} role="alert"><CircleAlert size={critical ? 23 : 17} style={{ flex: "0 0 auto" }} /><span><b>{critical ? "分析服務暫時停止" : "抱歉，遇到了一些錯誤。"}</b><br />{error}<br /><strong>錯誤代碼：{code}</strong><br /><Link className="error-report-link" href={`/report-error?code=${encodeURIComponent(code)}`}>回報錯誤，幫助建立者改善</Link></span></div>; }
-function ServiceAnnouncement() { const [notice, setNotice] = useState<{ announcement: string | null; announcementLevel: string } | null>(null); useEffect(() => { void fetch("/api/status").then((response) => response.ok ? response.json() : null).then(setNotice).catch(() => undefined); }, []); if (!notice?.announcement) return null; return <div className={`service-announcement ${notice.announcementLevel}`} role="status"><Megaphone size={22} /><div><strong>{notice.announcementLevel === "critical" ? "重要服務公告" : "服務公告"}</strong><p>{notice.announcement}</p></div></div>; }
+function clientSessionId() { if (typeof window === "undefined") return ""; const key = "aca-session-id"; const existing = window.sessionStorage.getItem(key); if (existing) return existing; const created = crypto.randomUUID(); window.sessionStorage.setItem(key, created); return created; }
+function logClientUsage(eventType: string, page: string) { void fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType, sessionId: clientSessionId(), page }) }).catch(() => undefined); }
+function ErrorNotice({ error, code = "SYSTEM-001" }: { error: string; code?: string }) { const critical = ["AI-010", "AI-011", "SHARE-010", "SYSTEM-003"].includes(code); const info = errorInfo(code); return <div className={`error-box error-box-detailed ${critical ? "error-box-critical" : ""}`} role="alert"><CircleAlert size={critical ? 23 : 19} style={{ flex: "0 0 auto" }} /><div className="error-notice-content"><b>{critical ? "分析服務暫時停止" : "抱歉，遇到了一些錯誤。"}</b><strong className="error-notice-title">{info.name}</strong><span>{error}</span><small>錯誤代碼：{code} · 影響程度：{info.severity}</small><Link className="error-report-link" href={`/report-error?code=${encodeURIComponent(code)}&page=report`}>立即前往回報錯誤 <ArrowRight size={14} /></Link></div></div>; }
+function ServiceAnnouncement() { const [notice, setNotice] = useState<{ announcement: string | null; announcementLevel: string } | null>(null); useEffect(() => { let alive = true; const load = () => { void fetch("/api/status", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((data) => { if (alive && data) setNotice(data); }).catch(() => undefined); }; load(); const timer = window.setInterval(load, 10000); return () => { alive = false; window.clearInterval(timer); }; }, []); if (!notice?.announcement) return null; return <div className={`service-announcement ${notice.announcementLevel}`} role="status" aria-live="polite"><Megaphone size={22} /><div><strong>{notice.announcementLevel === "critical" ? "重要服務公告" : "服務公告"}</strong><p>{notice.announcement}</p></div></div>; }
 function prettyCount(value: number) { return value.toLocaleString("zh-TW"); }
 function percent(value: number) { return `${Math.round(value)}%`; }
 function shortName(name: string) { return name.length > 10 ? `${name.slice(0, 10)}…` : name; }
@@ -134,7 +137,7 @@ function Upload({ platform, onParsed, onBack }: { platform: Platform; onParsed: 
     if (!file) return;
     setError(""); setErrorCode("FILE-003"); setParsing(true); setProgress(8);
     const startedAt = Date.now();
-    const logUsage = (eventType: string) => { void fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventType }) }).catch(() => undefined); };
+    const logUsage = (eventType: string) => { logClientUsage(eventType, "upload"); };
     logUsage("file_parse_start");
     try {
       setPhase("正在讀取聊天紀錄……"); setProgress(22); await delay(420); setPhase("正在整理訊息……"); setProgress(48);
@@ -255,8 +258,8 @@ function ReportPage({ report, messages, participants, currentMeId, currentRange,
   const [settingsOpen, setSettingsOpen] = useState(false); const [printOpen, setPrintOpen] = useState(false); const [showSensitive, setShowSensitive] = useState(true); const [aiEnabled, setAiEnabled] = useState(true); const [allowShare, setAllowShare] = useState(true); const [shareMode, setShareMode] = useState<ShareMode>("full"); const [printSections, setPrintSections] = useState<TabId[]>(PRINT_OPTIONS.map((item) => item.id));
   const goto = (tab: TabId) => { setActive(tab); window.setTimeout(() => document.getElementById(`report-${tab}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
   const runAi = async () => {
-    setAiLoading(true); setAiError(""); setAiProgress(12); setAiPhase("準備分析上下文……"); const startedAt = Date.now();
-    try { await delay(420); setAiPhase("整理互動與文字訊號……"); setAiProgress(38); const response = await fetch("/api/ai/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ report }) }); setAiPhase("理解聊天節奏與重點……"); setAiProgress(72); const data = await response.json() as AiAnalysis & { error?: string; code?: string }; if (!response.ok) throw new Error(`${data.code || "AI-010"}::${data.error || "AI 暫時無法完成分析。"}`); await delay(Math.max(0, 3000 - (Date.now() - startedAt))); setAiPhase("完成詳細分析！"); setAiProgress(100); await delay(240); setAi(data); setAiOpen(false); setActive("ai");     } catch (error) { setAiError(error instanceof Error ? error.message : "SYSTEM-001::AI 暫時無法完成分析，請稍後再試。"); } finally { setAiLoading(false); }
+    setAiLoading(true); setAiError(""); logClientUsage("ai_start", "ai"); setAiProgress(12); setAiPhase("準備分析上下文……"); const startedAt = Date.now();
+    try { await delay(420); setAiPhase("整理互動與文字訊號……"); setAiProgress(38); const response = await fetch("/api/ai/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ report }) }); setAiPhase("理解聊天節奏與重點……"); setAiProgress(72); const data = await response.json() as AiAnalysis & { error?: string; code?: string }; if (!response.ok) throw new Error(`${data.code || "AI-010"}::${data.error || "AI 暫時無法完成分析。"}`); await delay(Math.max(0, 3000 - (Date.now() - startedAt))); setAiPhase("完成詳細分析！"); setAiProgress(100); await delay(240); setAi(data); logClientUsage("ai_complete", "ai"); setAiOpen(false); setActive("ai");     } catch (error) { setAiError(error instanceof Error ? error.message : "SYSTEM-001::AI 暫時無法完成分析，請稍後再試。"); } finally { setAiLoading(false); }
   };
   const askAi = (question: string) => new Promise<string>((resolve) => { setAskError(""); setAskRequest({ question, resolve }); });
   const confirmAsk = async () => {
@@ -264,7 +267,7 @@ function ReportPage({ report, messages, participants, currentMeId, currentRange,
     setAskLoading(true); setAskError("");
     try { const response = await fetch("/api/ai/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ report, question: askRequest.question }) }); const data = await response.json() as { answer?: string; error?: string; code?: string }; if (!response.ok || !data.answer) throw new Error(`${data.code || "AI-010"}::${data.error || "AI 問答暫時無法完成。"}`); askRequest.resolve(data.answer); setAskRequest(null);     } catch (error) { setAskError(error instanceof Error ? error.message : "AI-010::AI 問答暫時無法完成。"); } finally { setAskLoading(false); }
   };
-  const share = async (anonymous: boolean, sections: ShareSection[]) => {
+  const share = async (anonymous: boolean, sections: string[]) => { logClientUsage("share_create", "share");
     setShareBusy(true);
     try {
       const safeReport = anonymous ? { ...report, me: { ...report.me, name: "PERSON_A" }, them: { ...report.them, name: "PERSON_B" }, personalities: { me: { ...report.personalities.me, name: "PERSON_A" }, them: { ...report.personalities.them, name: "PERSON_B" } } } : report;

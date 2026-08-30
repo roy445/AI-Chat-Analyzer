@@ -8,10 +8,10 @@ const ALLOWED_EVENTS: UsageEventType[] = [
 ];
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({})) as { eventType?: string };
+  const body = await request.json().catch(() => ({})) as { eventType?: string; sessionId?: string; page?: string };
   if (!body.eventType || !ALLOWED_EVENTS.includes(body.eventType as UsageEventType)) {
     return Response.json({ ok: false, error: "不支援的使用事件。" }, { status: 400 });
   }
-  await recordUsage(body.eventType as UsageEventType);
+  await recordUsage(body.eventType as UsageEventType, body.sessionId, body.page);
   return Response.json({ ok: true });
 }
