@@ -681,3 +681,7 @@ body { color: #17213d; }
 .admin-feedback { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
 .admin-feedback.success { border-color: #8bc7a8; background: #effaf3; color: #176642; }
 .admin-feedback.error { border-color: #e4a0aa; background: #fff1f3; color: #9f2942; }
+
+.error-source { display: inline-block; width: fit-content; margin-top: 4px; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
+.error-source.test { background: #fff0c9; color: #8b5c00; }
+.error-source.real { background: #ffe2e7; color: #a62c48; }
