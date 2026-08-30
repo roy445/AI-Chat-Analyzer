@@ -77,6 +77,24 @@
 | DB-002 | S1 | PostgreSQL SSL 設定不相容。 |
 | DB-003 | S0 | 資料庫憑證或錯誤內容可能被公開。立即停止資料庫 API。 |
 
+### Git 與版本控制（GIT）
+
+| Code | 等級 | 說明 |
+|---|---:|---|
+| GIT-001 | S1 | 找不到指定的 GitHub 儲存庫或分支。 |
+| GIT-002 | S1 | 遠端儲存庫拒絕推送，可能是權限、分支保護或遠端已有較新的提交。 |
+| GIT-003 | S1 | GitHub Token、SSH 金鑰或登入狀態無效。 |
+| GIT-004 | S2 | 本機分支與遠端分支發生無法自動合併的衝突。 |
+| GIT-005 | S3 | 工作區有尚未提交或尚未暫存的變更。 |
+
+### Vercel 與部署（DEPLOY）
+
+| Code | 等級 | 說明 |
+|---|---:|---|
+| DEPLOY-001 | S1 | Vercel 或其他部署環境無法完成 production build。 |
+| DEPLOY-002 | S1 | 部署環境缺少 `DATABASE_URL`、AI key 或其他必要環境變數。 |
+| DEPLOY-003 | S1 | 雲端資料庫尚未執行最新 SQL，導致 API 查詢或寫入失敗。 |
+
 ### 回報與系統（REPORT／SYSTEM）
 
 | Code | 等級 | 說明 |
