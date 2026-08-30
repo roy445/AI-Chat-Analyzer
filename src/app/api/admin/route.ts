@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       const info = errorInfo(code); const current = await getSettings(); const now = new Date();
       if (current.testErrorCode) await db.update(errorTestHistory).set({ stoppedAt: now }).where(and(eq(errorTestHistory.code, current.testErrorCode), isNull(errorTestHistory.stoppedAt)));
       await db.update(announcementHistory).set({ revokedAt: now }).where(and(eq(announcementHistory.source, "auto"), isNull(announcementHistory.revokedAt)));
-      const announcement = `測試公告：${code}｜${info.name} 已啟用。一般使用者流程目前會顯示測試錯誤。`;
+      const announcement = publicTestAnnouncement(code);
       await db.update(systemSettings).set({ testErrorCode: code, announcement, announcementLevel: "warning", updatedAt: now }).where(eq(systemSettings.id, 1));
       await db.insert(errorTestHistory).values({ code, name: info.name, severity: info.severity, source: "test" });
       await db.insert(announcementHistory).values({ message: announcement, level: "warning", source: "auto" });
@@ -57,6 +57,14 @@ export async function GET() {
     const announcementHistoryRows = await db.select().from(announcementHistory).orderBy(desc(announcementHistory.createdAt)).limit(100);
     return Response.json({ settings, totals, recent, activeCount: Number(activeRow[0]?.count || 0), testHistory, announcementHistory: announcementHistoryRows });
   } catch (error) { console.error("[admin] read failure", error); return errorResponse("ADMIN-006", "管理員資料庫尚未建立或暫時無法使用。", 503, "S1"); }
+}
+
+function publicTestAnnouncement(code: string) {
+  if (code.startsWith("AI-")) return "AI 分析服務目前暫時忙碌，請稍後再試。基本報告仍可繼續查看。";
+  if (code.startsWith("SHARE-")) return "分享服務目前正在維護，暫時無法建立或查看分享連結，請稍後再試。";
+  if (code.startsWith("FILE-")) return "檔案解析服務遇到問題，請確認檔案格式後稍後重新上傳。";
+  if (code.startsWith("ANALYSIS-")) return "分析服務目前正在處理異常，請稍後重新開始分析。";
+  return "部分服務目前暫時無法使用，我們正在處理，請稍後再試。";
 }
 
 async function getSettings() { const rows = await db.select().from(systemSettings).where(eq(systemSettings.id, 1)).limit(1); if (rows[0]) return rows[0]; await db.insert(systemSettings).values({ id: 1 }); const created = await db.select().from(systemSettings).where(eq(systemSettings.id, 1)).limit(1); return created[0]; }

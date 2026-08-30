@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     const page = body.page?.trim().slice(0, 200);
     const email = body.email?.trim().slice(0, 200);
     if (!message || message.length < 10) return NextResponse.json({ error: "請至少填寫 10 個字，讓我們了解你的問題或建議。" }, { status: 400 });
+    if (type === "error" && !body.code?.trim()) return NextResponse.json({ error: "錯誤回報必須填寫錯誤代碼；若沒有代碼，請改選「使用問題」。" }, { status: 400 });
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "聯絡信箱格式不正確。" }, { status: 400 });
     if (type !== "error") {
       if (!body.clientId?.trim()) return NextResponse.json({ error: "無法辨識此次匿名回報，請重新載入頁面後再試。" }, { status: 400 });

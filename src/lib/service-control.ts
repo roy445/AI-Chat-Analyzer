@@ -22,11 +22,21 @@ export async function recordError(code: string, message: string, severity: strin
   try {
     await db.insert(errorTestHistory).values({ code, name: errorInfo(code).name, severity, source, message: message.slice(0, 500) });
     if (source === "real" && (severity === "S0" || severity === "S1")) {
-      const announcement = `系統偵測到重大錯誤（${code}），部分功能可能暫時無法使用。我們正在處理，請稍後再試。`;
+      const announcement = publicAnnouncement(code);
       await db.update(systemSettings).set({ announcement, announcementLevel: severity === "S0" ? "critical" : "warning", updatedAt: new Date() }).where(eq(systemSettings.id, 1));
       await db.insert(announcementHistory).values({ message: announcement, level: severity === "S0" ? "critical" : "warning", source: "auto" });
     }
   } catch (error) { console.error("[error-history] unable to record error", error); }
+}
+
+function publicAnnouncement(code: string) {
+  if (code.startsWith("AI-")) return "AI 分析服務目前暫時忙碌，請稍後再試。基本報告仍可繼續查看。";
+  if (code.startsWith("SHARE-")) return "分享服務目前正在維護，暫時無法建立或查看分享連結，請稍後再試。";
+  if (code.startsWith("FILE-")) return "檔案解析服務遇到問題，請確認檔案格式後稍後重新上傳。";
+  if (code.startsWith("ANALYSIS-")) return "分析服務目前正在處理異常，請稍後重新開始分析。";
+  if (code.startsWith("DB-") || code.startsWith("DEPLOY-")) return "部分服務正在維護，部分功能可能暫時無法使用，請稍後再試。";
+  if (code.startsWith("SYSTEM-")) return "系統目前正在處理異常狀況，部分功能可能暫時無法使用，請稍後再試。";
+  return "部分服務目前暫時無法使用，我們正在處理，請稍後再試。";
 }
 
 export async function stopActiveError(code: string) {
