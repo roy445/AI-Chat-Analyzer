@@ -556,3 +556,20 @@ body::before { content: ""; position: fixed; z-index: -2; inset: 0; pointer-even
 .platform-logo.logo-instagram { background: transparent; box-shadow: none; }
 .platform-logo.logo-instagram .platform-logo-image { padding: 0; border-radius: 17px; }
 
+/* High-contrast reading pass */
+:root { --ink: #17213d; --muted: #52627d; --line: #d8dfeb; --blue: #566bd3; --blue-dark: #3f52b7; }
+body { color: #17213d; }
+.nav-link, .footer, .chat-date, .file-hint, .guide-official, .section-heading p, .flow-title p, .hero-copy, .feature-card p, .platform-card p, .step p, .report-main-header p, .report-sidebar > p, .guide-top p, .guide-subheading p, .guide-bullets, .guide-step p, .notice, .muted, .analysis-copy p { color: #52627d; }
+.hero h1, .flow-title h1, .section-heading h2, .report-main-header h2, .report-sidebar h1, .report-section-title h3, .platform-card h3, .guide-top h2, .guide-step h3, .dropzone h3, .identify-card h3, .feature-card h3 { color: #17213d; }
+.eyebrow, .progress-line b, .platform-card .card-arrow, .guide-official a { color: #3f52b7; }
+.guide-summary span, .section-heading .eyebrow, .report-section-title span { color: #66738d; }
+.guide-summary b { color: #3f4d69; }
+.trust-row, .trust-row span { color: #5b6b86; }
+.bubble { color: #43516d; }
+.sidebar-nav button { color: #52627d; }
+.sidebar-nav button:hover, .sidebar-nav button.active { color: #3f52b7; }
+.analysis-step { color: #687690; }
+.analysis-step.active { color: #3f4d69; }
+.error-box { color: #913d35; }
+
+
