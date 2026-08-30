@@ -16,6 +16,13 @@ ALTER TABLE error_test_history ADD COLUMN IF NOT EXISTS message TEXT NULL;
 CREATE INDEX IF NOT EXISTS error_test_history_started_at_idx ON error_test_history (started_at DESC);
 CREATE INDEX IF NOT EXISTS error_test_history_active_idx ON error_test_history (code) WHERE stopped_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS feedback_submissions (
+  id SERIAL PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS feedback_submissions_fingerprint_idx ON feedback_submissions (fingerprint, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS announcement_history (
   id SERIAL PRIMARY KEY,
   message TEXT NOT NULL,
