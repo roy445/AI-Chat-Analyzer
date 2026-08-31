@@ -16,6 +16,23 @@ ALTER TABLE error_test_history ADD COLUMN IF NOT EXISTS message TEXT NULL;
 CREATE INDEX IF NOT EXISTS error_test_history_started_at_idx ON error_test_history (started_at DESC);
 CREATE INDEX IF NOT EXISTS error_test_history_active_idx ON error_test_history (code) WHERE stopped_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id SERIAL PRIMARY KEY,
+  ticket_number TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL,
+  error_code TEXT NULL,
+  error_name TEXT NULL,
+  page TEXT NULL,
+  message TEXT NOT NULL,
+  email TEXT NULL,
+  status TEXT NOT NULL DEFAULT 'new',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ NULL
+);
+CREATE INDEX IF NOT EXISTS support_tickets_status_created_idx ON support_tickets (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS support_tickets_number_idx ON support_tickets (ticket_number);
+
 CREATE TABLE IF NOT EXISTS feedback_submissions (
   id SERIAL PRIMARY KEY,
   fingerprint TEXT NOT NULL,

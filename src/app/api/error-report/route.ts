@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { feedbackSubmissions } from "@/db/schema";
+import { feedbackSubmissions, supportTickets } from "@/db/schema";
 import { sendMail } from "@/lib/critical-notify";
 import { errorInfo } from "@/lib/error-catalog";
 
@@ -28,13 +28,15 @@ export async function POST(request: Request) {
       if (previous[0]) { const nextAllowedAt = new Date(previous[0].createdAt.getTime() + FEEDBACK_COOLDOWN_MS); return NextResponse.json({ error: "建議與使用問題每 3 天只能送出一次。錯誤回報不受此限制。", nextAllowedAt: nextAllowedAt.toISOString() }, { status: 429 }); }
       await db.insert(feedbackSubmissions).values({ fingerprint });
     }
-    if (!process.env.GMAIL_USER?.trim() || !process.env.GMAIL_APP_PASSWORD?.trim()) return NextResponse.json({ error: "Gmail SMTP 尚未設定，請稍後再試或直接提供內容給建立者。" }, { status: 503 });
     const receivedAt = new Date().toISOString();
     const known = !code.startsWith("USER-") ? errorInfo(code) : null;
     const typeName = type === "suggestion" ? "功能建議" : type === "question" ? "使用問題" : "錯誤回報";
-    const html = `<h2>AI Chat Analyzer ${typeName}</h2><p><strong>回報類型：</strong>${escapeHtml(typeName)}</p><p><strong>錯誤代碼：</strong>${escapeHtml(code)}</p>${known ? `<p><strong>系統判別名稱：</strong>${escapeHtml(known.name)}</p>` : ""}<p><strong>發生位置：</strong>${escapeHtml(page || "未指定")}</p><p><strong>聯絡信箱：</strong>${escapeHtml(email || "未提供")}</p><p><strong>發生時間：</strong>${receivedAt}</p><hr /><p><strong>內容：</strong></p><p>${escapeHtml(message).replace(/\n/g, "<br />")}</p>`;
-    try { await sendMail({ subject: `[AI Chat Analyzer][${typeName}] ${code}`, html, replyTo: email || undefined }); } catch (error) { console.error("[error-report] gmail failed", error instanceof Error ? error.message : "unknown"); return NextResponse.json({ error: "Gmail 郵件寄送失敗，請稍後再試。" }, { status: 502 }); }
-    return NextResponse.json({ message: `${typeName}已送出，謝謝你幫助我們改善。` });
+    const ticketNumber = `ACA-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomBytes(3).toString("hex").toUpperCase()}`;
+    await db.insert(supportTickets).values({ ticketNumber, type, errorCode: type === "error" ? code : null, errorName: type === "error" && known && !known.code.startsWith("USER-") ? known.name : null, page: page || null, message, email: email || null });
+    const html = `<h2>AI Chat Analyzer ${typeName}</h2><p><strong>案件單號：</strong>${escapeHtml(ticketNumber)}</p><p><strong>回報類型：</strong>${escapeHtml(typeName)}</p>${type === "error" ? `<p><strong>錯誤代碼：</strong>${escapeHtml(code)}</p>${known ? `<p><strong>系統判別名稱：</strong>${escapeHtml(known.name)}</p>` : ""}` : ""}<p><strong>發生位置：</strong>${escapeHtml(page || "未指定")}</p><p><strong>聯絡信箱：</strong>${escapeHtml(email || "未提供")}</p><p><strong>發生時間：</strong>${receivedAt}</p><hr /><p><strong>內容：</strong></p><p>${escapeHtml(message).replace(/\n/g, "<br />")}</p>`;
+    if (!process.env.GMAIL_USER?.trim() || !process.env.GMAIL_APP_PASSWORD?.trim()) return NextResponse.json({ error: "Gmail SMTP 尚未設定；案件已建立，請保留單號聯絡建立者。", ticketNumber }, { status: 503 });
+    try { await sendMail({ subject: `[AI Chat Analyzer][${typeName}] ${ticketNumber}`, html, replyTo: email || undefined }); } catch (error) { console.error("[error-report] gmail failed", error instanceof Error ? error.message : "unknown"); return NextResponse.json({ error: "Gmail 郵件寄送失敗；案件已建立，請保留單號。", ticketNumber }, { status: 502 }); }
+    return NextResponse.json({ message: `${typeName}已送出，謝謝你幫助我們改善。`, ticketNumber });
   } catch (error) { console.error("[error-report] request failed", error); return NextResponse.json({ error: "回報資料處理失敗，請稍後再試。" }, { status: 500 }); }
 }
 

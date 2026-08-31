@@ -902,3 +902,20 @@ pre, code, .usage-list, .admin-error-detail, .service-announcement { max-width: 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Support ticket management: readable on mobile first, expandable without overflow. */
+.admin-ticket-toolbar { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 16px 0; }
+.admin-search { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 12px; border: 1px solid var(--line, #eadfd7); border-radius: 12px; background: var(--surface, #fffdf9); }
+.admin-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; }
+.admin-count { margin-left: auto; color: var(--coral, #d96f55); font-size: .78em; font-weight: 700; }
+.ticket-item { min-width: 0; padding: 16px 0; border-top: 1px solid var(--line, #eadfd7); }
+.ticket-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.ticket-heading > div { min-width: 0; }
+.ticket-heading strong { display: block; overflow-wrap: anywhere; color: var(--ink, #302b3d); }
+.ticket-heading small, .ticket-meta { display: block; color: var(--muted, #756d7c); font-size: .82rem; line-height: 1.55; overflow-wrap: anywhere; }
+.ticket-heading select { flex: 0 0 auto; max-width: 112px; }
+.ticket-item p { margin: 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink, #302b3d); }
+.ticket-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+@media (min-width: 640px) { .admin-ticket-toolbar { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+@media (max-width: 420px) { .ticket-heading { flex-direction: column; } .ticket-heading select { max-width: none; width: 100%; } .admin-count { display: block; margin: 4px 0 0; } }
+@media (prefers-reduced-motion: reduce) { .ticket-item, .admin-search { transition: none !important; } }

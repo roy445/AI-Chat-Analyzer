@@ -26,6 +26,21 @@ export const feedbackSubmissions = pgTable("feedback_submissions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketNumber: text("ticket_number").notNull().unique(),
+  type: text("type").notNull(),
+  errorCode: text("error_code"),
+  errorName: text("error_name"),
+  page: text("page"),
+  message: text("message").notNull(),
+  email: text("email"),
+  status: text("status").notNull().default("new"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
 export const announcementHistory = pgTable("announcement_history", {
   id: serial("id").primaryKey(),
   message: text("message").notNull(),

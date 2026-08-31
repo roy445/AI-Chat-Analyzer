@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { announcementHistory, errorTestHistory, systemSettings, usageEvents } from "@/db/schema";
+import { announcementHistory, errorTestHistory, supportTickets, systemSettings, usageEvents } from "@/db/schema";
 import { errorInfo } from "@/lib/error-catalog";
 import { clearAdminCookie, isAdmin, setAdminCookie, validPassword } from "@/lib/admin-auth";
 import { errorResponse } from "@/lib/errors";
@@ -8,12 +8,13 @@ import { errorResponse } from "@/lib/errors";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({})) as { action?: string; password?: string; analysisEnabled?: boolean; aiEnabled?: boolean; sharingEnabled?: boolean; announcement?: string; announcementLevel?: string; testErrorCode?: string | null; eventType?: string };
+  const body = await request.json().catch(() => ({})) as { action?: string; password?: string; analysisEnabled?: boolean; aiEnabled?: boolean; sharingEnabled?: boolean; announcement?: string; announcementLevel?: string; testErrorCode?: string | null; eventType?: string; ticketNumber?: string; status?: string };
   if (body.action === "login") { if (!validPassword(body.password || "")) return errorResponse("ADMIN-001", "管理員密碼不正確或尚未設定。", 401, "S1"); const response = Response.json({ ok: true }); setAdminCookie(response); return response; }
   if (body.action === "logout") { const response = Response.json({ ok: true }); clearAdminCookie(response); return response; }
   if (!(await isAdmin())) return errorResponse("ADMIN-002", "需要管理員登入才能執行這個操作。", 401, "S2");
   try {
     if (body.action === "log") { if (!body.eventType) return errorResponse("ADMIN-003", "不支援的使用事件類型。", 400, "S2"); await db.insert(usageEvents).values({ eventType: body.eventType }); return Response.json({ ok: true }); }
+    if (body.action === "ticket_status") { const ticketNumber = body.ticketNumber?.trim(); const nextStatus = body.status?.trim(); if (!ticketNumber || !["new", "in_progress", "resolved", "ignored"].includes(nextStatus || "")) return errorResponse("ADMIN-007", "案件單號或處理狀態無效。", 400, "S2"); const updatedAt = new Date(); await db.update(supportTickets).set({ status: nextStatus!, updatedAt, resolvedAt: nextStatus === "resolved" ? updatedAt : null }).where(eq(supportTickets.ticketNumber, ticketNumber)); return Response.json({ ok: true, ticketNumber, status: nextStatus }); }
     if (body.action === "settings") {
       const current = await getSettings();
       const now = new Date();
@@ -62,7 +63,8 @@ export async function GET() {
     const activeRow = await db.select({ count: sql<number>`count(distinct ${usageEvents.sessionId})` }).from(usageEvents).where(gt(usageEvents.createdAt, sql`now() - interval '10 minutes'`));
     const testHistory = (await db.select().from(errorTestHistory).orderBy(desc(errorTestHistory.startedAt)).limit(150)).filter((item) => !item.code.startsWith("ADMIN-"));
     const announcementHistoryRows = await db.select().from(announcementHistory).orderBy(desc(announcementHistory.createdAt)).limit(100);
-    return Response.json({ settings, totals, recent, activeCount: Number(activeRow[0]?.count || 0), testHistory, announcementHistory: announcementHistoryRows });
+    const tickets = await db.select().from(supportTickets).orderBy(desc(supportTickets.createdAt)).limit(200);
+    return Response.json({ settings, totals, recent, activeCount: Number(activeRow[0]?.count || 0), testHistory, announcementHistory: announcementHistoryRows, tickets });
   } catch (error) { console.error("[admin] read failure", error); return errorResponse("ADMIN-006", "管理員資料庫尚未建立或暫時無法使用。", 503, "S1"); }
 }
 
